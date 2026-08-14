@@ -243,6 +243,19 @@ function M.agent_for_path(path)
   return nil
 end
 
+--- All bound tasks as {name, path, agent} list (sorted by name)
+function M.roots_list()
+  local map = read_map()
+  local out = {}
+  for name, entry in pairs(map) do
+    table.insert(out, { name = name, path = entry.path, agent = entry.agent })
+  end
+  table.sort(out, function(a, b)
+    return a.name:lower() < b.name:lower()
+  end)
+  return out
+end
+
 function M.set_root(name, path, agent)
   name = name and tostring(name):match("^%s*(.-)%s*$")
   path = M.normalize(path)

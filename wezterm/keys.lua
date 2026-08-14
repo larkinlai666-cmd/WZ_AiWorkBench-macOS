@@ -3,12 +3,12 @@
 --  Cmd+Shift primary; Fn+F aliases; no Leader (D-007); zero Ctrl bindings.
 --  Workbench keys are fully digested by WezTerm — never reach agent TUIs.
 --  Key names use lowercase letters + explicit SHIFT|SUPER mods (canonical form).
---  Default keys (Cmd+T/R/C/V/W/F/N/Q/H, Cmd+1-9, Cmd+Shift+P) are preserved.
---  M2 scope: N/D/E/H actions toast their milestone; real flows land in M3/M4.
+--  M3 wiring: Cmd+T = Init hub tab; Cmd+Shift+L = task panel; Cmd+Shift+N = wizard.
 -- =============================================================================
 
 local wezterm = require("wezterm")
 local act = wezterm.action
+local init = require("init")
 
 local M = {}
 
@@ -22,8 +22,27 @@ local function cb(fn)
   return wezterm.action_callback(fn)
 end
 
-local function pending(window, pane, name, milestone)
-  toast(window, "AI STAR CUBE", name .. " — " .. milestone .. " 交付中（契约已绑定）", 2200)
+--- Cmd+T: new tab = Init hub (welcome screen + auto task picker)
+local function new_init_tab(window, pane)
+  local tab, main
+  pcall(function()
+    tab, main = window:mux_window():spawn_tab({ args = init.welcome_args(), cwd = wezterm.home_dir })
+  end)
+  if tab then
+    pcall(function()
+      tab:set_title("Init")
+    end)
+  end
+  if main then
+    pcall(function()
+      main:activate()
+    end)
+    wezterm.time.call_after(0.4, function()
+      pcall(function()
+        init.show_hub(window, window:active_pane())
+      end)
+    end)
+  end
 end
 
 function M.apply(config)
@@ -32,30 +51,44 @@ function M.apply(config)
 
   config.keys = {
     ------------------------------------------------------------------
-    -- Primary: Cmd+Shift family (window-local, agent-transparent)
+    -- Primary: Cmd family (window-local, agent-transparent)
     ------------------------------------------------------------------
-    { key = "n", mods = "SHIFT|SUPER", action = cb(function(w, p) pending(w, p, "新建项目向导", "M3") end) },
-    { key = "d", mods = "SHIFT|SUPER", action = cb(function(w, p) pending(w, p, "三栏 AI 桌", "M4") end) },
-    { key = "e", mods = "SHIFT|SUPER", action = cb(function(w, p) pending(w, p, "Explorer 侧栏", "M4") end) },
-    { key = "h", mods = "SHIFT|SUPER", action = cb(function(w, p) pending(w, p, "速查面板", "M4") end) },
+    { key = "t", mods = "SUPER", action = cb(new_init_tab) },
+    { key = "l", mods = "SHIFT|SUPER", action = cb(function(w, p) init.show_hub(w, p) end) },
+    { key = "n", mods = "SHIFT|SUPER", action = cb(function(w, p) init.new_project(w, p) end) },
+    { key = "d", mods = "SHIFT|SUPER", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "三栏 AI 桌 — M4 交付中（agent 单页签已可用：选任务即可启动）", 2500)
+    end) },
+    { key = "e", mods = "SHIFT|SUPER", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "Explorer 侧栏 — M4 交付中", 2500)
+    end) },
+    { key = "h", mods = "SHIFT|SUPER", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "速查面板 — M4 交付中", 2500)
+    end) },
     { key = "w", mods = "SHIFT|SUPER", action = act.CloseCurrentPane({ confirm = true }) },
 
     ------------------------------------------------------------------
     -- Aliases: Fn+F keys (macOS media-key layer; not a stability dependency)
     ------------------------------------------------------------------
-    { key = "F3", mods = "NONE", action = cb(function(w, p) pending(w, p, "新建项目向导", "M3") end) },
+    { key = "F3", mods = "NONE", action = cb(function(w, p) init.new_project(w, p) end) },
     { key = "F4", mods = "NONE", action = act.CloseCurrentPane({ confirm = true }) },
     { key = "F5", mods = "NONE", action = act.ReloadConfiguration },
-    { key = "F6", mods = "NONE", action = cb(function(w, p) pending(w, p, "三栏 AI 桌", "M4") end) },
-    { key = "F7", mods = "NONE", action = cb(function(w, p) pending(w, p, "Explorer 侧栏", "M4") end) },
-    { key = "F1", mods = "NONE", action = cb(function(w, p) pending(w, p, "速查面板", "M4") end) },
+    { key = "F6", mods = "NONE", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "三栏 AI 桌 — M4 交付中", 2500)
+    end) },
+    { key = "F7", mods = "NONE", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "Explorer 侧栏 — M4 交付中", 2500)
+    end) },
+    { key = "F1", mods = "NONE", action = cb(function(w, p)
+      toast(w, "AI STAR CUBE", "速查面板 — M4 交付中", 2500)
+    end) },
   }
 
   wezterm.on("window-config-reloaded", function(window, pane)
     pcall(function()
       window:toast_notification(
         "AI STAR CUBE",
-        "配置已重载 · Cmd+Shift+N 新建 · Cmd+Shift+D 三栏 · Cmd+Shift+E 侧栏",
+        "配置已重载 · Cmd+T Init · Cmd+Shift+L 任务面板 · Cmd+Shift+N 新建",
         nil,
         5000
       )

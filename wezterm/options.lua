@@ -95,9 +95,10 @@ function M.apply(config)
   }
 
   ------------------------------------------------------------------
-  -- Shell / new-tab default
+  -- Shell / new-tab default: Init hub welcome screen (M3)
   ------------------------------------------------------------------
-  config.default_prog = { "/bin/zsh", "-l" }
+  local init = require("init")
+  config.default_prog = init.welcome_args()
   config.default_cwd = wezterm.home_dir
 
   ------------------------------------------------------------------

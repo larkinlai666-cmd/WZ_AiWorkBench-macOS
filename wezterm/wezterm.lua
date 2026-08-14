@@ -20,6 +20,7 @@ do
       type(k) == "string"
       and (
         k == "options" or k == "keys" or k == "desk" or k == "agents" or k == "status" or k == "layouts"
+        or k == "init"
       )
     then
       table.insert(doomed, k)
@@ -65,8 +66,9 @@ local function safe_apply(label, mod)
   end
 end
 
--- Load order: options (chrome) -> keys -> status -> layouts
+-- Load order: options (chrome) -> init (hub) -> keys -> status -> layouts
 safe_apply("options", safe_require("options"))
+safe_apply("init", safe_require("init"))
 safe_apply("keys", safe_require("keys"))
 safe_apply("status", safe_require("status"))
 safe_apply("layouts", safe_require("layouts"))

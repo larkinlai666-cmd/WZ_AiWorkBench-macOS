@@ -64,6 +64,10 @@ install() {
   cp -R "$SRC_DIR"/. "$TARGET"/
   ok "deployed config -> $TARGET"
   mkdir -p "$WORKBENCH_DIR"
+  if [ -f "$SRC_DIR/welcome.txt" ]; then
+    cp "$SRC_DIR/welcome.txt" "$WORKBENCH_DIR/welcome.txt"
+    ok "deployed welcome screen"
+  fi
   if [ ! -f "$ROOTS_FILE" ]; then
     printf '# AI STAR CUBE desk roots — name<TAB>path<TAB>agent\n' > "$ROOTS_FILE"
     ok "created empty desk-roots"
