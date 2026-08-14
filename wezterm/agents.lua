@@ -51,6 +51,7 @@ local REGISTRY = {
     resume_last = { "<exe>", "--continue" },
     resume_picker = { "<exe>", "--resume" },
     session_root = home .. "/.deepseek-cli/sessions",
+    line_repl = true, -- line-based REPL: clear after splash so cat art never lingers
   },
   kimi = {
     display = "Kimi",
@@ -185,6 +186,32 @@ end
 --- Spawn cwd for an agent: flag-mode agents get project root as spawn cwd too
 function M.spawn_cwd(id, root)
   return root
+end
+
+local function sh_quote(s)
+  return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+end
+
+local splash_file = home .. "/.config/wezterm/splash.txt"
+
+--- Splash-prefixed spawn args: cat splash (300ms) then exec the agent.
+--- Line-based REPLs (deepseek) clear after splash so cat art never lingers.
+function M.splash_args(id, root)
+  local entry = REGISTRY[id]
+  if not entry then
+    return nil
+  end
+  local exe = M.resolve_exe(id) or entry.path_names[1]
+  local cmd = "cat " .. sh_quote(splash_file) .. " 2>/dev/null; sleep 0.3"
+  if entry.line_repl then
+    cmd = cmd .. "; clear"
+  end
+  if entry.launch_mode == "flag" then
+    cmd = cmd .. "; exec " .. sh_quote(exe) .. " " .. entry.cwd_flag .. " " .. sh_quote(root)
+  else
+    cmd = cmd .. "; exec " .. sh_quote(exe)
+  end
+  return { "/bin/zsh", "-l", "-c", cmd }
 end
 
 return M

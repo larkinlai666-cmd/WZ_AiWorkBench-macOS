@@ -95,10 +95,10 @@ function M.apply(config)
   }
 
   ------------------------------------------------------------------
-  -- Shell / new-tab default: Init hub welcome screen (M3)
+  -- Shell / new-tab default: Init static panel (M4)
   ------------------------------------------------------------------
   local init = require("init")
-  config.default_prog = init.welcome_args()
+  config.default_prog = init.panel_args()
   config.default_cwd = wezterm.home_dir
 
   ------------------------------------------------------------------

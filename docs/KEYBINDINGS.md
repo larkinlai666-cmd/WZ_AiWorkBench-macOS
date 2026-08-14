@@ -14,19 +14,18 @@
 
 | 动作 | 主键 | 别名 | 默认冲突核对 |
 |---|---|---|---|
-| 新建项目向导 | Cmd+Shift+N | Fn+F3 | 无冲突（Cmd+N 默认=新窗口，Cmd+Shift+N 空闲） |
+| 新 Init 面板页签 | Cmd+T | Fn+F3 | 复用默认 Cmd+T 语义（default_prog=面板） |
 | 三栏 AI 桌（agent 平权选择器） | Cmd+Shift+D | Fn+F6 | 无冲突 |
 | Explorer 侧栏 | Cmd+Shift+E | Fn+F7 | 无冲突 |
 | 速查面板 | Cmd+Shift+H | Fn+F1 | 无冲突（Cmd+H 默认=隐藏应用，保留） |
 | 关闭窗格 | Cmd+Shift+W | Fn+F4 | 无冲突（Cmd+W 默认=关标签带确认，保留） |
 | 重载配置 | Cmd+R（默认，直接复用） | Fn+F5 | 默认键，零新增 |
-| 新标签 = Init 面板 | Cmd+T（默认） | 标签栏 + | 默认键，default_prog 指向 Init |
 
-## Init 面板本地键（仅面板输入行生效）
+## Init 面板内键（静态屏行输入，仅面板 pane 生效）
 
-- 数字 = 任务号；`n<号>` = 强制新会话；两位数 `<任务><agent>` = 一次直启（默认视图 ≤9 行）。
-- `a` = 全量视图；`c` = 新建项目向导；`s` = 纯 shell 逃生；`r` = 刷新；`q` = 取消/退出。
-- Enter 空 = 默认 agent（缺省解析）。
+- 数字 = 任务号；`n<号>` = 强制新会话；两位数 `<任务><agent>` = 一次直启（≤9 任务）。
+- `c` = 新建任务向导；`s` = 纯 shell；`r` = 刷新；`q` = 退出面板（关标签）。
+- step2 行输入：数字 = agent 号；Enter 空 = 默认（绑定列优先）；q = 取消零 spawn。
 
 ## 保留的 WezTerm 默认键（不覆盖）
 

@@ -40,8 +40,8 @@
 | workbench/keys.lua | wezterm/keys.lua | 键位契约重写（KEYBINDINGS.md） |
 | workbench/layouts.lua | wezterm/layouts.lua | 高继承（三栏/门禁顺序），agent 平权选择器 |
 | workbench/projects.lua | wezterm/projects.lua | 概念继承（选择器/收藏） |
-| workbench/bootstrap.ps1 | wezterm/init.lua | 契约继承（两步流），实现纯 Lua |
-| workbench/sidebar.ps1 | wezterm/sidebar.lua | 契约继承（同根、单击打开），实现纯 Lua |
+| workbench/bootstrap.ps1 | wezterm/init.sh（zsh 静态屏） | 契约全继承（三区/表格/行输入/两步流/D-013），实现用 macOS 内置 zsh（对称原版 Windows 内置 PowerShell）；不用 InputSelector 浮层 |
+| workbench/sidebar.ps1 | wezterm/sidebar.lua | 契约继承（同根、单击打开），实现纯 Lua（InputSelector 仅作浏览导航面，非 Init 面板） |
 | workbench/help.lua | wezterm/help.lua | 高继承 |
 | workbench/hyperlinks.lua | wezterm/hyperlinks.lua | 高继承（POSIX 路径规则） |
 
