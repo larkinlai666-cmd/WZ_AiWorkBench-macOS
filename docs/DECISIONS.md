@@ -12,6 +12,7 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - D-M1-004 Agent 平权注册表
 - D-M1-005 蒸馏契约、独立实现
 - D-M1-006 Init 静态屏用 zsh（修正 D-M1-002 面板部分）
+- D-M1-007 zsh 禁用 path 变量名（保留变量陷阱）
 
 ## 记录
 
@@ -63,3 +64,16 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - 理由：WezTerm Lua 无键盘事件捕获 API，无法做行输入循环；InputSelector 浮层与原版静态屏面板形态不一致（用户 2026-08-14 明确质疑）。zsh 是 macOS 系统内置运行时，与"零外部依赖"不冲突，且与原版"Windows 用内置 PowerShell 5.1"完全对称。
 - 修正：D-M1-002 的"纯 Lua"限定为窗口/键位/状态/布局层；pane 内交互程序使用系统内置 shell。
 - 影响：wezterm/init.sh（新）、init.lua 精简为面板入口；删除 Cmd+Shift+L / Cmd+Shift+N（新建内嵌面板 c 键）。
+
+### D-M1-007 [active]
+
+- **zsh 脚本禁用 `path` 作为变量名**（zsh 保留变量，与 PATH 标量双向同步；`local path=...` 或 `read -r ... path ...` 会直接覆盖 PATH，导致后续外部命令全部找不到）。统一改用 `ppath`。同族陷阱：顶层（函数外）禁止 `local`（read 行为异常回显赋值）；`print -r` 不解释 `\t`（文件数据写入用 `printf '%s\t%s\n'`）。
+- 来源：2026-08-15 对抗性审查，explorer.sh 收藏写入触发 mktemp not found（PATH 被 local path 覆盖）。
+- 影响：init.sh / explorer.sh / wzlib.zsh 全部变量命名规范；审查清单必查项。
+
+### 对抗性审查结论（2026-08-15）
+
+- 修复：status.lua `agents.registry_order` 缺括号（每次 tab 重绘报错，修复前日志 192+ 条）；layouts.lua 三栏选择器在 agents.lua 重写后接口破坏（entry 表当 id）；sidebar 过期键位提示；agents.installed() 无缓存（500ms tick 高频读文件）。
+- 补全：Explorer 重做为自绘静态屏（explorer.sh，四区 + 数字导航 + g/gd/b/w/p/f/r/a/q，对齐原版 Show-Listing）；Init 面板补 a 全量视图、d dash(grok)。
+- 防线：explorer 视觉回归并入 check.sh；wzlib.zsh 公共库消除双份拷贝；注册表加载按 id 去重。
+- 验证：当前 GUI 会话日志零错误；Init a 键、Explorer 数字导航/收藏/D-012、d 键 dash 全部 cli 层实测通过。

@@ -85,17 +85,17 @@ function M.pick_and_spawn(window, pane, root)
     return
   end
   if #installed == 1 then
-    M.spawn_workbench(window, pane, root, installed[1])
+    M.spawn_workbench(window, pane, root, installed[1].id)
     return
   end
   local preferred = desk.agent_for_path(root)
   local order = {}
-  if preferred then
+  if preferred and agents.is_installed(preferred) then
     table.insert(order, preferred)
   end
-  for _, id in ipairs(installed) do
-    if id ~= preferred then
-      table.insert(order, id)
+  for _, e in ipairs(installed) do
+    if e.id ~= preferred then
+      table.insert(order, e.id)
     end
   end
   local choices = {}
@@ -104,7 +104,7 @@ function M.pick_and_spawn(window, pane, root)
     local label = entry.display
     if id == preferred then
       label = label .. "  ★默认(绑定)"
-    elseif not preferred and id == agents.registry_order[1] then
+    elseif not preferred and id == installed[1].id then
       label = label .. "  ★默认"
     end
     table.insert(choices, { id = id, label = label })
@@ -128,7 +128,7 @@ end
 function M.open_workbench(window, pane)
   local _, root = desk.ensure(window, pane)
   if not desk.is_strong_path(root) then
-    toast(window, "AI 对话桌", "未绑定项目 — 先 Cmd+Shift+L 选任务或 Cmd+Shift+N 新建", 4500)
+    toast(window, "AI 对话桌", "未绑定项目 — 在 Init 面板 wz> 选任务，或 c 新建（Cmd+T 开面板）", 4500)
     return
   end
   M.pick_and_spawn(window, pane, root)

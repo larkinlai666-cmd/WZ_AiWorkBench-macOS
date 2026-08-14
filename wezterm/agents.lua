@@ -112,8 +112,18 @@ function M.resolve_exe(spec)
   return nil
 end
 
---- Resolved registry (exe hidden rows dropped), file read fresh each call
+--- Resolved registry (exe hidden rows dropped), cached per config load.
+--- The entry point clears package.loaded on reload, so this cache dies with it.
+local cache = nil
+
+function M.invalidate()
+  cache = nil
+end
+
 function M.installed()
+  if cache then
+    return cache
+  end
   local rows = M.read_registry()
   local out = {}
   for _, r in ipairs(rows) do
@@ -128,6 +138,7 @@ function M.installed()
       out[#out + 1] = e
     end
   end
+  cache = out
   return out
 end
 

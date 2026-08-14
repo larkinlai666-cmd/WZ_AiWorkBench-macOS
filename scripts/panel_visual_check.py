@@ -22,6 +22,7 @@ import unicodedata
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INIT = os.path.join(REPO, "wezterm", "init.sh")
+WZLIB = os.path.join(REPO, "wezterm", "wzlib.zsh")
 COLS = 80
 INNER = COLS - 6
 TOT = INNER + 4
@@ -63,10 +64,11 @@ def render() -> str:
                 "ghost\tGHOST\tno-such-exe-xyz\tcwd\t\t0\n"
             )
         env = dict(os.environ)
+        env["WZ_LIB"] = WZLIB
         env["WZ_ROOTS_FILE"] = roots
         env["WZ_AGENTS_FILE"] = agentsf
-        # n1 -> step2 render; q -> cancel back to step1; q -> exit (no spawns)
-        feed = "n1\nq\nq\n"
+        # n1 -> step2 render; q -> cancel; a -> all-view; q -> exit (no spawns)
+        feed = "n1\nq\na\nq\n"
         p = subprocess.run(
             ["zsh", INIT], input=feed, capture_output=True, text=True, env=env
         )
@@ -132,10 +134,11 @@ def main():
     check("AGY" in text, "user-registered agent 'agy' rendered")
     check("GHOST" not in text, "unresolvable registry row hidden (equal footing)")
 
-    # 7) two-step flow texts
+    # 7) two-step flow texts + all-view toggle
     check("2 AGENT  << step 2 · pick agent for Alpha" in text, "step2 title switches with pending task")
     check("agent 1-" in text and "(Enter = default, q = cancel)" in text, "step2 agent line-input prompt")
     check("! launch cancelled" in text, "cancel hint repaint after q")
+    check("ALL non-noise (combo off)" in text, "a toggles all-view (combo off)")
     check("wz>" in text, "step1 wz> prompt present")
 
     print("")

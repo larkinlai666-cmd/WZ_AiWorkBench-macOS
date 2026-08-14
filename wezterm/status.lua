@@ -60,10 +60,9 @@ end
 local function tool_role(proc, title)
   proc = (proc or ""):lower()
   title = (title or ""):lower()
-  local ids = agents.registry_order
-  for _, id in ipairs(ids) do
-    if proc:find(id, 1, true) or title:find(id, 1, true) then
-      return agents.entry(id).display
+  for _, e in ipairs(agents.installed()) do
+    if proc:find(e.id, 1, true) or title:find(e.id, 1, true) then
+      return e.display
     end
   end
   if proc:find("zsh", 1, true) or proc:find("bash", 1, true) or proc:find("sh", 1, true) then

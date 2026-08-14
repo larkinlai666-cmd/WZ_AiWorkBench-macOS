@@ -5,7 +5,7 @@
 【核心 · Cmd 系】
   Cmd+T           新 Init 面板页签（冷启动自动进入面板）
   Cmd+Shift+D     三栏 AI 桌（agent + shell + 监视）
-  Cmd+Shift+E     Explorer 侧栏（当前页签任务根）
+  Cmd+Shift+E     Explorer 面板页签（当前任务根）
   Cmd+Shift+H     本速查面板（开关）
   Cmd+Shift+W     关闭窗格
   Cmd+R           重载配置
@@ -25,6 +25,20 @@
   wz> n<数字>         强制新会话 → 选模型
   wz> c               新建任务向导（名 → 父目录 → 冻结）
   wz> s               纯 shell 页签
+  wz> a               全量视图切换
+  wz> d               grok Dashboard
   wz> r               刷新
   wz> q               退出面板（关标签）
+
+【Explorer 面板（静态屏 · 行输入）】
+  explorer> 数字      进入目录 / 打开文件 / 跳收藏
+  explorer> 0/..      上级目录
+  explorer> s         回到 DESK 根
+  explorer> g         AI@当前视图    gd = AI@DESK
+  explorer> b         绑定当前视图为任务根
+  explorer> w         纯 shell 页签
+  explorer> p         复制路径
+  explorer> f         收藏/取消收藏
+  explorer> r/a       刷新 / 自动刷新开关
+  explorer> q         退出面板（关标签）
 ═══════════════════════════════════════════════════════════

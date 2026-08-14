@@ -38,6 +38,15 @@ else
   FAIL=1
 fi
 
+say "== explorer visual grid =="
+if python3 scripts/explorer_visual_check.py >/tmp/wz-check-explorer.log 2>&1; then
+  ok "explorer visual grid PASS"
+else
+  bad "explorer visual grid FAIL"
+  tail -n 15 /tmp/wz-check-explorer.log
+  FAIL=1
+fi
+
 say "== show-keys parse =="
 if [ -n "$WEZ" ]; then
   if "$WEZ" --config-file "$DIR/wezterm/wezterm.lua" show-keys --lua >/dev/null 2>/tmp/wz-check-keys.err; then
