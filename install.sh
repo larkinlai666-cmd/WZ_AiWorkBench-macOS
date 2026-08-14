@@ -55,6 +55,15 @@ install() {
     bad "source not found: $SRC_DIR/wezterm.lua"
     exit 1
   fi
+  # Preserve user data (desk-roots, agent registry) across reinstalls:
+  # the whole TARGET dir is moved away below, so snapshot workbench first.
+  local data_bak=""
+  if [ -d "$WORKBENCH_DIR" ]; then
+    data_bak="${TMPDIR:-/tmp}/wz-workbench-$STAMP"
+    mkdir -p "$data_bak"
+    cp -R "$WORKBENCH_DIR"/. "$data_bak"/ 2>/dev/null
+    ok "snapshotted user data -> $data_bak"
+  fi
   if [ -d "$TARGET" ]; then
     local bak="$HOME/.config/wezterm.bak-$STAMP"
     mv "$TARGET" "$bak"
@@ -64,11 +73,21 @@ install() {
   cp -R "$SRC_DIR"/. "$TARGET"/
   ok "deployed config -> $TARGET"
   mkdir -p "$WORKBENCH_DIR"
+  if [ -n "$data_bak" ] && [ -d "$data_bak" ]; then
+    cp -R "$data_bak"/. "$WORKBENCH_DIR"/ 2>/dev/null
+    ok "restored user data (desk-roots, agent registry)"
+  fi
   if [ ! -f "$ROOTS_FILE" ]; then
     printf '# AI STAR CUBE desk roots — name<TAB>path<TAB>agent\n' > "$ROOTS_FILE"
     ok "created empty desk-roots"
   else
     ok "kept existing desk-roots (not overwritten)"
+  fi
+  if [ -f "$SRC_DIR/agents.tsv.default" ] && [ ! -f "$WORKBENCH_DIR/agents.tsv" ]; then
+    cp "$SRC_DIR/agents.tsv.default" "$WORKBENCH_DIR/agents.tsv"
+    ok "created agent registry from template"
+  else
+    ok "kept existing agent registry (not overwritten)"
   fi
   say ""
   doctor

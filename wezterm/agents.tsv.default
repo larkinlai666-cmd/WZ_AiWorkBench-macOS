@@ -1,0 +1,19 @@
+# AI STAR CUBE agent registry — single source of truth for BOTH layers
+# (wezterm/agents.lua and the zsh Init panel read this same file)
+#
+# Columns (TAB separated):
+#   id      machine id, unique
+#   label   display label (shown in 2 AGENT)
+#   exe     executable NAME (resolved via PATH + absolute candidates)
+#           or an ABSOLUTE PATH
+#   mode    flag  = agent receives <cwd_flag> <project-root>
+#           cwd   = spawn cwd carries identity (no flag)
+#   flag    cwd flag for flag-mode agents (e.g. -C, --cwd)
+#   clear   1 = clear screen after splash (line-based REPLs)
+#
+# Equal footing: a row whose exe cannot be resolved is HIDDEN, never an error.
+# Register new agent types by appending rows; restart the panel or press r.
+codex	OpenAI Codex CLI	codex	flag	-C	0
+grok	Grok Build CLI	grok	flag	--cwd	0
+kimi	Kimi Code CLI	kimi	cwd		0
+deepseek	DeepSeek CLI	deepseek	cwd		1

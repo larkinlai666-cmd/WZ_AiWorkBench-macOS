@@ -8,15 +8,17 @@
 #    - two-step grammar: <num> -> agent · <t><a> one-shot · n<num> force-new
 #    - bright yellow = the ONLY input-affordance color; frames never yellow
 #    - short-lived tab (D-012): agent spawned -> panel exits -> tab closes
-#  Alignment discipline: every line inside a box goes through key_row/box_line
-#  and has EXACTLY INNER+4 display cells (checked by scripts/panel_visual_check.py).
-#  WZ_ROOTS_FILE env override exists for the visual regression harness.
+#  Agent source: workbench/agents.tsv — the SAME registry agents.lua reads.
+#  Rows whose exe cannot be resolved (PATH or absolute candidates) are hidden.
+#  Column discipline: LIST columns carry a 2-cell gap (upstream ColGap).
+#  WZ_ROOTS_FILE / WZ_AGENTS_FILE env overrides exist for the visual harness.
 # =============================================================================
 emulate -L zsh
 set -u
 
 WZ_DIR="$HOME/.config/wezterm"
 ROOTS_FILE="${WZ_ROOTS_FILE:-$WZ_DIR/workbench/desk-roots.tsv}"
+AGENT_FILE="${WZ_AGENTS_FILE:-$WZ_DIR/workbench/agents.tsv}"
 SPLASH_FILE="$WZ_DIR/splash.txt"
 WEZ="$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")"
 
@@ -43,7 +45,7 @@ typeset INNER=$(( COLS - 6 ))
 typeset TOT=$(( INNER + 4 ))   # every box line = INNER+4 display cells
 
 # ---- state ----
-typeset -a AGENTS
+typeset -a A_ID A_LABEL A_EXE A_MODE A_FLAG A_CLEAR
 typeset -a TASKS_NAME TASKS_PATH TASKS_AGENT
 typeset step=1
 typeset pending_idx=0
@@ -145,7 +147,6 @@ key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
     used=$(( used + w ))
   done
   if (( used > budget )); then
-    # shrink the last segment to fit (upstream Limit-Display discipline)
     local last_text="${texts[-1]}"
     local last_w
     last_w=$(dwidth "$last_text")
@@ -183,26 +184,86 @@ key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
 }
 
 # =============================================================================
+# agent registry (workbench/agents.tsv — same file agents.lua reads)
+# =============================================================================
+resolve_agent_exe() {  # <name or /abs/path> -> runnable path or empty
+  local exe="$1"
+  if [[ "$exe" == /* ]]; then
+    [[ -x "$exe" ]] && print -n "$exe"
+    return
+  fi
+  local found c
+  found=$(command -v "$exe" 2>/dev/null)
+  if [[ -n "$found" && -x "$found" ]]; then
+    print -n "$found"
+    return
+  fi
+  for c in \
+    "$HOME/.local/bin/$exe" "$HOME/.kimi-code/bin/$exe" "$HOME/.codex/bin/$exe" \
+    "$HOME/.grok/bin/$exe" "$HOME/.deepseek-cli/bin/$exe" "$HOME/.npm-global/bin/$exe" \
+    "/opt/homebrew/bin/$exe" "/usr/local/bin/$exe"; do
+    [[ -x "$c" ]] && { print -n "$c"; return; }
+  done
+  print -n ""
+}
+
+load_agents() {
+  A_ID=(); A_LABEL=(); A_EXE=(); A_MODE=(); A_FLAG=(); A_CLEAR=()
+  local id label exe mode flag clear exep
+  if [[ -f "$AGENT_FILE" ]]; then
+    while IFS=$'\t' read -r id label exe mode flag clear; do
+      [[ -z "$id" || "$id" == \#* ]] && continue
+      exep=$(resolve_agent_exe "$exe")
+      [[ -z "$exep" ]] && continue   # missing exe -> hidden (equal footing)
+      A_ID+=("$id")
+      A_LABEL+=("${label:-$id}")
+      A_EXE+=("$exep")
+      [[ "$mode" == "flag" ]] && A_MODE+=("flag") || A_MODE+=("cwd")
+      A_FLAG+=("${flag:-}")
+      A_CLEAR+=("${clear:-0}")
+    done < "$AGENT_FILE"
+  fi
+  # Built-in fallback when the registry file is absent
+  if (( ${#A_ID} == 0 )); then
+    local n
+    for n in codex grok kimi deepseek; do
+      exep=$(resolve_agent_exe "$n")
+      [[ -z "$exep" ]] && continue
+      A_ID+=("$n")
+      A_EXE+=("$exep")
+      case "$n" in
+        codex)    A_LABEL+=("OpenAI Codex CLI"); A_MODE+=("flag"); A_FLAG+=("-C");     A_CLEAR+=("0") ;;
+        grok)     A_LABEL+=("Grok Build CLI");   A_MODE+=("flag"); A_FLAG+=("--cwd");  A_CLEAR+=("0") ;;
+        kimi)     A_LABEL+=("Kimi Code CLI");    A_MODE+=("cwd");  A_FLAG+=("");       A_CLEAR+=("0") ;;
+        deepseek) A_LABEL+=("DeepSeek CLI");     A_MODE+=("cwd");  A_FLAG+=("");       A_CLEAR+=("1") ;;
+      esac
+    done
+  fi
+}
+
+agent_index_of() {  # <id> -> 1-based index or 0
+  local i
+  i=1
+  while (( i <= ${#A_ID} )); do
+    [[ "${A_ID[$i]}" == "$1" ]] && { print -n $i; return; }
+    i=$(( i + 1 ))
+  done
+  print -n 0
+}
+
+default_agent_idx() {  # pending task bound agent (D-005) else first installed
+  local bound bi
+  if (( pending_idx >= 1 && pending_idx <= ${#TASKS_NAME} )); then
+    bound="${TASKS_AGENT[$pending_idx]}"
+    bi=$(agent_index_of "$bound")
+    (( bi > 0 )) && { print -n $bi; return; }
+  fi
+  (( ${#A_ID} > 0 )) && print -n 1
+}
+
+# =============================================================================
 # data load
 # =============================================================================
-detect_agents() {
-  AGENTS=()
-  command -v codex    >/dev/null 2>&1 && AGENTS+=(codex)
-  command -v deepseek >/dev/null 2>&1 && AGENTS+=(deepseek)
-  command -v kimi     >/dev/null 2>&1 && AGENTS+=(kimi)
-  command -v grok     >/dev/null 2>&1 && AGENTS+=(grok)
-}
-
-agent_label() {
-  case "$1" in
-    codex) print -n "Codex" ;;
-    deepseek) print -n "DeepSeek" ;;
-    kimi) print -n "Kimi" ;;
-    grok) print -n "Grok" ;;
-    *) print -n "$1" ;;
-  esac
-}
-
 load_tasks() {
   TASKS_NAME=(); TASKS_PATH=(); TASKS_AGENT=()
   local name path agent
@@ -213,23 +274,13 @@ load_tasks() {
       [[ -d "$path" ]] || continue
       TASKS_NAME+=("$name")
       TASKS_PATH+=("$path")
-      TASKS_AGENT+=("${agent:-${AGENTS[1]:-}}")
+      TASKS_AGENT+=("${agent:-}")
     done < "$ROOTS_FILE"
   fi
 }
 
 task_mtime() {  # task_mtime <path> -> "MM-dd HH:mm"
   stat -f '%Sm' -t '%m-%d %H:%M' "$1" 2>/dev/null || print -n "??-?? ??:??"
-}
-
-default_agent() {
-  if (( ${#TASKS_AGENT[@]} > 0 )); then
-    print -n "${TASKS_AGENT[1]}"
-  elif (( ${#AGENTS[@]} > 0 )); then
-    print -n "${AGENTS[1]}"
-  else
-    print -n "codex"
-  fi
 }
 
 # =============================================================================
@@ -241,9 +292,9 @@ render() {
   local chipTok rowTok
   local i n t
 
-  # LIST column widths (identical for header and rows)
-  local W_DATE=13 W_TAG=6 W_PROJ=14 W_AGENT=8
-  local W_PATH=$(( INNER - 1 - 3 - 3 - W_DATE - W_TAG - W_PROJ - W_AGENT ))
+  # LIST column widths + 2-cell gap between columns (upstream ColGap)
+  local W_DATE=13 W_TAG=6 W_PROJ=14 W_AGENT=8 GAP=2
+  local W_PATH=$(( INNER - 1 - 3 - 3 - (W_DATE+GAP) - (W_TAG+GAP) - (W_PROJ+GAP) - GAP - W_AGENT ))
   (( W_PATH < 8 )) && W_PATH=8
 
   # ----- HEADER -----
@@ -265,9 +316,13 @@ render() {
     "D:[#]" \
     "D:   " \
     "D:$(pad 'DateTime' $W_DATE)" \
+    "D:  " \
     "D:$(pad 'Tag' $W_TAG)" \
+    "D:  " \
     "D:$(pad 'Project' $W_PROJ)" \
+    "D:  " \
     "D:$(pad 'Path' $W_PATH)" \
+    "D:  " \
     "D:$(pad 'Agent' $W_AGENT)"
   box_rule "$C"
 
@@ -281,10 +336,14 @@ render() {
         "${chipTok}:[$i]" \
         "${chipTok}:   " \
         "${rowTok}:$(pad "$(task_mtime "${TASKS_PATH[$i]}")" $W_DATE)" \
+        "${rowTok}:  " \
         "${rowTok}:$(pad '[任务]' $W_TAG)" \
+        "${rowTok}:  " \
         "${rowTok}:$(pad "${TASKS_NAME[$i]}" $W_PROJ)" \
+        "${rowTok}:  " \
         "${rowTok}:$(pad "${TASKS_PATH[$i]}" $W_PATH)" \
-        "${rowTok}:$(pad "$(agent_label "${TASKS_AGENT[$i]}")" $W_AGENT)"
+        "${rowTok}:  " \
+        "${rowTok}:$(pad "${TASKS_AGENT[$i]}" $W_AGENT)"
       i=$(( i + 1 ))
     done
   fi
@@ -300,22 +359,22 @@ render() {
     ag_title="2 AGENT"
   fi
   box_top "$ag_title" "$M"
-  if (( ${#AGENTS} == 0 )); then
-    box_line "(no codex/deepseek/kimi/grok CLI detected)" "$D"
+  if (( ${#A_ID} == 0 )); then
+    box_line "(no agent CLI detected — registry empty or exes missing)" "$D"
   else
     local a_chipTok a_nameTok a_modeTok
     if (( agt_active )); then a_chipTok="Y"; a_nameTok="W"; a_modeTok="G"; else a_chipTok="D"; a_nameTok="G"; a_modeTok="D"; fi
-    local def
-    def=$(default_agent)
+    local def_idx
+    def_idx=$(default_agent_idx)
     i=1
-    for n in "${AGENTS[@]}"; do
+    while (( i <= ${#A_ID} )); do
       local mode="new"
-      if (( agt_active && force_new == 0 )) && [[ "$n" == "${TASKS_AGENT[$pending_idx]}" ]]; then mode="resume"; fi
+      if (( agt_active && force_new == 0 )) && [[ "${A_ID[$i]}" == "${TASKS_AGENT[$pending_idx]}" ]]; then mode="resume"; fi
       local tag=""
-      [[ "$n" == "$def" ]] && tag=" (default)"
+      (( i == def_idx )) && tag=" (default)"
       local segs=()
       segs+=("${a_chipTok}:[$i]")
-      segs+=("${a_nameTok}: $(agent_label "$n")")
+      segs+=("${a_nameTok}: ${A_LABEL[$i]}")
       segs+=("${a_modeTok}:  ${mode}")
       [[ -n "$tag" ]] && segs+=("E:${tag}")
       key_row "$M" "${segs[@]}"
@@ -350,20 +409,31 @@ render() {
   box_bottom "$D"
 }
 
+agent_label_of() {  # <id> -> registry label, fallback id
+  local idx
+  idx=$(agent_index_of "$1")
+  if (( idx > 0 )); then
+    print -n "${A_LABEL[$idx]}"
+  else
+    print -n "$1"
+  fi
+}
+
 # =============================================================================
 # spawn + close (D-012)
 # =============================================================================
-launch_agent() {  # launch_agent <name> <path> <agent>
-  local name="$1" root="$2" agent="$3"
+launch_agent() {  # launch_agent <name> <path> <agent-index>
+  local name="$1" root="$2" idx="$3"
+  local exe="${A_EXE[$idx]}" mode="${A_MODE[$idx]}" flag="${A_FLAG[$idx]}" clear="${A_CLEAR[$idx]}"
   local safe_root="${root//\'/\'\\\'\'}"
+  local safe_exe="${exe//\'/\'\\\'\'}"
   local cmd="cat '$SPLASH_FILE' 2>/dev/null; sleep 0.3"
-  case "$agent" in
-    codex)    cmd+="; exec codex -C '$safe_root'" ;;
-    grok)     cmd+="; exec grok --cwd '$safe_root'" ;;
-    deepseek) cmd+="; clear; exec deepseek" ;;
-    kimi)     cmd+="; exec kimi" ;;
-    *)        cmd+="; exec zsh -l" ;;
-  esac
+  [[ "$clear" == "1" ]] && cmd+="; clear"
+  if [[ "$mode" == "flag" && -n "$flag" ]]; then
+    cmd+="; exec '$safe_exe' $flag '$safe_root'"
+  else
+    cmd+="; exec '$safe_exe'"
+  fi
   "$WEZ" cli spawn --cwd "$root" -- /bin/zsh -lc "$cmd" >/dev/null 2>&1
   # D-012: panel pane exits -> sole-pane tab closes with it
   exit 0
@@ -421,24 +491,25 @@ wizard() {
   fi
   mkdir -p "$root" 2>/dev/null || { hint="mkdir failed: $root"; return }
   printf 'name=%s\npath=%s\n' "$name" "$root" > "$root/.wz-project"
-  local def
-  def=$(default_agent)
-  printf '%s\t%s\t%s\n' "$name" "$root" "$def" >> "$ROOTS_FILE"
-  launch_agent "$name" "$root" "$def"
+  local def_id
+  (( ${#A_ID} > 0 )) && def_id="${A_ID[1]}" || def_id="codex"
+  printf '%s\t%s\t%s\n' "$name" "$root" "$def_id" >> "$ROOTS_FILE"
+  local di
+  di=$(agent_index_of "$def_id")
+  launch_agent "$name" "$root" $di
 }
 
 # =============================================================================
 # input handling
 # =============================================================================
 step2_input() {
-  local line
-  print -n "${Y}  agent 1-${#AGENTS} (Enter = default, q = cancel) ${X}"
+  local line def_idx
+  def_idx=$(default_agent_idx)
+  print -n "${Y}  agent 1-${#A_ID} (Enter = default, q = cancel) ${X}"
   read -r line || { print ""; exit 0 }
   line="${line// /}"
-  local def
-  def=$(default_agent)
   if [[ -z "$line" ]]; then
-    launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" "$def"
+    launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" $def_idx
   fi
   if [[ "$line" == "q" || "$line" == "Q" ]]; then
     step=1; pending_idx=0; force_new=0
@@ -447,11 +518,11 @@ step2_input() {
   fi
   if [[ "$line" =~ ^[0-9]+$ ]]; then
     local n=$line
-    if (( n >= 1 && n <= ${#AGENTS} )); then
-      launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" "${AGENTS[$n]}"
+    if (( n >= 1 && n <= ${#A_ID} )); then
+      launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" $n
     fi
   fi
-  hint="no such agent — Enter = default, 1-${#AGENTS}, q = cancel"
+  hint="no such agent — Enter = default, 1-${#A_ID}, q = cancel"
 }
 
 step1_input() {
@@ -465,7 +536,7 @@ step1_input() {
     exit 0
   fi
   if [[ "$line" == "c" || "$line" == "C" ]]; then wizard; return; fi
-  if [[ "$line" == "r" || "$line" == "R" ]]; then detect_agents; load_tasks; hint="refreshed"; return; fi
+  if [[ "$line" == "r" || "$line" == "R" ]]; then load_agents; load_tasks; hint="refreshed"; return; fi
   if [[ "$line" == "s" || "$line" == "S" ]]; then
     if [[ -n "$WEZ" ]]; then
       open_shell
@@ -478,10 +549,10 @@ step1_input() {
   # D-010 combo fast path: <t><a> two digits, one-shot launch
   if [[ "$line" =~ ^[0-9]{2}$ ]] && (( ${#TASKS_NAME} >= 1 && ${#TASKS_NAME} <= 9 )); then
     local t="${line[1]}" a="${line[2]}"
-    if (( t >= 1 && t <= ${#TASKS_NAME} && a >= 1 && a <= ${#AGENTS} )); then
-      launch_agent "${TASKS_NAME[$t]}" "${TASKS_PATH[$t]}" "${AGENTS[$a]}"
+    if (( t >= 1 && t <= ${#TASKS_NAME} && a >= 1 && a <= ${#A_ID} )); then
+      launch_agent "${TASKS_NAME[$t]}" "${TASKS_PATH[$t]}" $a
     fi
-    hint="combo agent digit must be 1-${#AGENTS}"
+    hint="combo agent digit must be 1-${#A_ID}"
     return
   fi
   if [[ "$line" =~ ^[nN][0-9]+$ ]]; then
@@ -511,7 +582,7 @@ step1_input() {
 # =============================================================================
 # main loop
 # =============================================================================
-detect_agents
+load_agents
 load_tasks
 
 while true; do
