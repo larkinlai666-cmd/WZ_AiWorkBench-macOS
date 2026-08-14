@@ -8,13 +8,15 @@
 #    - two-step grammar: <num> -> agent · <t><a> one-shot · n<num> force-new
 #    - bright yellow = the ONLY input-affordance color; frames never yellow
 #    - short-lived tab (D-012): agent spawned -> panel exits -> tab closes
-#  Data source: desk-roots.tsv bindings only (no agent private session parsing).
+#  Alignment discipline: every line inside a box goes through key_row/box_line
+#  and has EXACTLY INNER+4 display cells (checked by scripts/panel_visual_check.py).
+#  WZ_ROOTS_FILE env override exists for the visual regression harness.
 # =============================================================================
 emulate -L zsh
 set -u
 
 WZ_DIR="$HOME/.config/wezterm"
-ROOTS_FILE="$WZ_DIR/workbench/desk-roots.tsv"
+ROOTS_FILE="${WZ_ROOTS_FILE:-$WZ_DIR/workbench/desk-roots.tsv}"
 SPLASH_FILE="$WZ_DIR/splash.txt"
 WEZ="$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")"
 
@@ -38,6 +40,7 @@ if [[ -n "$sz" ]]; then
 fi
 (( COLS < 54 )) && COLS=54
 typeset INNER=$(( COLS - 6 ))
+typeset TOT=$(( INNER + 4 ))   # every box line = INNER+4 display cells
 
 # ---- state ----
 typeset -a AGENTS
@@ -49,26 +52,48 @@ typeset hint=""
 typeset now=""
 
 # =============================================================================
-# helpers
+# width helpers (display cells, CJK = 2 — same wcwidth semantics WezTerm uses)
 # =============================================================================
-pad() {  # pad <text> <width> — pad or hard-truncate with '~'
-  local t="$1"
-  local w="$2"
-  local n=${#t}
-  if (( n > w )); then
-    print -n "${t[1,$((w-1))]}~"
+dwidth() {
+  local s="$1" w=0
+  local c
+  for c in ${(s::)s}; do
+    case "$c" in
+      [$'\u1100'-$'\u115f']|[$'\u2e80'-$'\ua4cf']|[$'\uac00'-$'\ud7a3']|[$'\uf900'-$'\ufaff']|[$'\ufe30'-$'\ufe4f']|[$'\uff00'-$'\uff60']|[$'\uffe0'-$'\uffe6'])
+        w=$(( w + 2 )) ;;
+      *)
+        w=$(( w + 1 )) ;;
+    esac
+  done
+  print -n $w
+}
+
+pad() {  # pad <text> <width> — display-width aware; hard-truncate with '~'
+  local t="$1" w="$2"
+  local dw
+  dw=$(dwidth "$t")
+  if (( dw > w )); then
+    local s="$t"
+    while (( $(dwidth "$s") > w - 1 )) && (( ${#s} > 1 )); do
+      s="${s[1,-2]}"
+    done
+    print -n "${s}~"
   else
     print -n "$t"
     local i
-    for (( i = n; i < w; i++ )); do print -n " "; done
+    for (( i = dw; i < w; i++ )); do print -n " "; done
   fi
 }
 
+# =============================================================================
+# box primitives — every line exactly TOT cells wide
+# =============================================================================
 box_top() {  # box_top <title> <color>
   local title="$1"
   local colr="$2"
   local t=" $title "
-  local tw=${#t}
+  local tw
+  tw=$(dwidth "$t")
   local fill=$(( INNER - tw ))
   (( fill < 0 )) && fill=0
   local left=$(( fill / 2 ))
@@ -88,10 +113,10 @@ box_rule() {  # box_rule <color>
   print "|${X}"
 }
 
-box_line() {  # box_line <text> <color>
+box_line() {  # box_line <text> <color> — 3 + INNER + 1 = TOT
   local text="$1" colr="$2"
-  print -n "${colr}  |${X} "
-  pad "$text" $INNER
+  print -n "${colr}  |${X}"
+  pad " $text" $INNER
   print "${colr}|${X}"
 }
 
@@ -102,23 +127,59 @@ box_bottom() {  # box_bottom <color>
   print "+${X}"
 }
 
-key_row() {  # key_row <color> "chip:keycolor" "label:labelcolor" [ ... ]
+# Multi-segment row: "tok:text" pairs; pads to TOT; right border always flush.
+key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
   local colr="$1"; shift
-  print -n "${colr}  |${X} "
-  local seg tok k v
+  local seg tok v
+  local -a texts=() colors=()
   for seg in "$@"; do
     tok="${seg%%:*}"
     v="${seg#*:}"
-    case "$tok" in
-      Y) print -n "${Y}${v}${X}" ;;
-      W) print -n "${W}${v}${X}" ;;
-      G) print -n "${G}${v}${X}" ;;
-      D) print -n "${D}${v}${X}" ;;
-      E) print -n "${E}${v}${X}" ;;
-      *) print -n "$v" ;;
+    texts+=("$v")
+    colors+=("$tok")
+  done
+  local budget=$(( INNER - 1 ))
+  local used=0 i w
+  for (( i = 1; i <= ${#texts}; i++ )); do
+    w=$(dwidth "${texts[$i]}")
+    used=$(( used + w ))
+  done
+  if (( used > budget )); then
+    # shrink the last segment to fit (upstream Limit-Display discipline)
+    local last_text="${texts[-1]}"
+    local last_w
+    last_w=$(dwidth "$last_text")
+    local room=$(( budget - (used - last_w) ))
+    if (( room < 1 )); then
+      texts[-1]=""
+    else
+      local s="$last_text"
+      while (( $(dwidth "$s") > room )) && (( ${#s} > 1 )); do
+        s="${s[1,-2]}"
+      done
+      texts[-1]="$s"
+    fi
+  fi
+  used=0
+  for (( i = 1; i <= ${#texts}; i++ )); do
+    w=$(dwidth "${texts[$i]}")
+    used=$(( used + w ))
+  done
+  local pad=$(( budget - used ))
+  print -n "${colr}  |${X} "
+  for (( i = 1; i <= ${#texts}; i++ )); do
+    case "${colors[$i]}" in
+      Y) print -n "${Y}${texts[$i]}${X}" ;;
+      W) print -n "${W}${texts[$i]}${X}" ;;
+      G) print -n "${G}${texts[$i]}${X}" ;;
+      D) print -n "${D}${texts[$i]}${X}" ;;
+      E) print -n "${E}${texts[$i]}${X}" ;;
+      *) print -n "${texts[$i]}" ;;
     esac
   done
-  print "${colr}  |${X}"
+  local j
+  for (( j = 0; j < pad; j++ )); do print -n " "; done
+  print "${colr}|${X}"
 }
 
 # =============================================================================
@@ -177,8 +238,13 @@ default_agent() {
 render() {
   print -n $'\e[2J\e[H'
   local list_active=$(( step == 1 ))
-  local chipC rowC
+  local chipTok rowTok
   local i n t
+
+  # LIST column widths (identical for header and rows)
+  local W_DATE=13 W_TAG=6 W_PROJ=14 W_AGENT=8
+  local W_PATH=$(( INNER - 1 - 3 - 3 - W_DATE - W_TAG - W_PROJ - W_AGENT ))
+  (( W_PATH < 8 )) && W_PATH=8
 
   # ----- HEADER -----
   box_top "WZ INIT" "$D"
@@ -195,32 +261,30 @@ render() {
   local list_title
   if (( list_active )); then list_title="1 LIST  << step 1 · type task number"; else list_title="1 LIST"; fi
   box_top "$list_title" "$C"
-  # header row: [#] DateTime Tag Project Path Agent
-  print -n "${D}  |${X} "
-  print -n "${D} [#]${X}   ${D}"
-  pad "DateTime" 13
-  pad "Tag" 6
-  pad "Project" 14
-  pad "Path" $(( INNER - 4 - 13 - 6 - 14 - 8 - 6 ))
-  pad "Agent" 8
-  print "${D}  |${X}"
+  key_row "$C" \
+    "D:[#]" \
+    "D:   " \
+    "D:$(pad 'DateTime' $W_DATE)" \
+    "D:$(pad 'Tag' $W_TAG)" \
+    "D:$(pad 'Project' $W_PROJ)" \
+    "D:$(pad 'Path' $W_PATH)" \
+    "D:$(pad 'Agent' $W_AGENT)"
   box_rule "$C"
 
   if (( ${#TASKS_NAME} == 0 )); then
     box_line "(empty)  press  c  in COMMAND to create first task" "$G"
   else
-    if (( list_active )); then chipC="$Y"; rowC="$G"; else chipC="$D"; rowC="$D"; fi
+    if (( list_active )); then chipTok="Y"; rowTok="G"; else chipTok="D"; rowTok="D"; fi
     i=1
     while (( i <= ${#TASKS_NAME} )); do
-      print -n "${C}  |${X} "
-      print -n "${chipC}[$i]${X}   "
-      print -n "${rowC}"
-      pad "$(task_mtime "${TASKS_PATH[$i]}")" 13
-      pad "[任务]" 6
-      pad "${TASKS_NAME[$i]}" 14
-      pad "${TASKS_PATH[$i]}" $(( INNER - 4 - 13 - 6 - 14 - 8 - 6 ))
-      pad "$(agent_label "${TASKS_AGENT[$i]}")" 8
-      print "${C}  |${X}"
+      key_row "$C" \
+        "${chipTok}:[$i]" \
+        "${chipTok}:   " \
+        "${rowTok}:$(pad "$(task_mtime "${TASKS_PATH[$i]}")" $W_DATE)" \
+        "${rowTok}:$(pad '[任务]' $W_TAG)" \
+        "${rowTok}:$(pad "${TASKS_NAME[$i]}" $W_PROJ)" \
+        "${rowTok}:$(pad "${TASKS_PATH[$i]}" $W_PATH)" \
+        "${rowTok}:$(pad "$(agent_label "${TASKS_AGENT[$i]}")" $W_AGENT)"
       i=$(( i + 1 ))
     done
   fi
@@ -239,20 +303,22 @@ render() {
   if (( ${#AGENTS} == 0 )); then
     box_line "(no codex/deepseek/kimi/grok CLI detected)" "$D"
   else
-    local a_chip a_name a_mode
-    if (( agt_active )); then a_chip="$Y"; a_name="$W"; a_mode="$G"; else a_chip="$D"; a_name="$G"; a_mode="$D"; fi
-    local def=$(default_agent)
+    local a_chipTok a_nameTok a_modeTok
+    if (( agt_active )); then a_chipTok="Y"; a_nameTok="W"; a_modeTok="G"; else a_chipTok="D"; a_nameTok="G"; a_modeTok="D"; fi
+    local def
+    def=$(default_agent)
     i=1
     for n in "${AGENTS[@]}"; do
       local mode="new"
       if (( agt_active && force_new == 0 )) && [[ "$n" == "${TASKS_AGENT[$pending_idx]}" ]]; then mode="resume"; fi
       local tag=""
       [[ "$n" == "$def" ]] && tag=" (default)"
-      print -n "${M}  |${X} "
-      print -n "${a_chip}[$i]${X} ${a_name}$(agent_label "$n")${X}"
-      print -n "  ${a_mode}${mode}${X}"
-      [[ -n "$tag" ]] && print -n "${E}${tag}${X}"
-      print "${M}  |${X}"
+      local segs=()
+      segs+=("${a_chipTok}:[$i]")
+      segs+=("${a_nameTok}: $(agent_label "$n")")
+      segs+=("${a_modeTok}:  ${mode}")
+      [[ -n "$tag" ]] && segs+=("E:${tag}")
+      key_row "$M" "${segs[@]}"
       i=$(( i + 1 ))
     done
   fi
@@ -355,7 +421,8 @@ wizard() {
   fi
   mkdir -p "$root" 2>/dev/null || { hint="mkdir failed: $root"; return }
   printf 'name=%s\npath=%s\n' "$name" "$root" > "$root/.wz-project"
-  local def=$(default_agent)
+  local def
+  def=$(default_agent)
   printf '%s\t%s\t%s\n' "$name" "$root" "$def" >> "$ROOTS_FILE"
   launch_agent "$name" "$root" "$def"
 }
@@ -365,10 +432,11 @@ wizard() {
 # =============================================================================
 step2_input() {
   local line
-  print -n "${Y}  agent ${D}(Enter = default, q = cancel)${X} "
+  print -n "${Y}  agent 1-${#AGENTS} (Enter = default, q = cancel) ${X}"
   read -r line || { print ""; exit 0 }
   line="${line// /}"
-  local def=$(default_agent)
+  local def
+  def=$(default_agent)
   if [[ -z "$line" ]]; then
     launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" "$def"
   fi

@@ -29,6 +29,15 @@ else
   FAIL=1
 fi
 
+say "== panel visual grid =="
+if python3 scripts/panel_visual_check.py >/tmp/wz-check-visual.log 2>&1; then
+  ok "panel visual grid PASS"
+else
+  bad "panel visual grid FAIL"
+  tail -n 15 /tmp/wz-check-visual.log
+  FAIL=1
+fi
+
 say "== show-keys parse =="
 if [ -n "$WEZ" ]; then
   if "$WEZ" --config-file "$DIR/wezterm/wezterm.lua" show-keys --lua >/dev/null 2>/tmp/wz-check-keys.err; then
