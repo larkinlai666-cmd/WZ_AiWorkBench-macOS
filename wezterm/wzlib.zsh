@@ -3,7 +3,8 @@
 #  Provides: ANSI palette, width helpers, box primitives, agent registry
 #  parsing, agent launch, shell spawn.
 #  Caller must define before sourcing:
-#    WZ_DIR  WZ_LIB(optional override)  SPLASH_FILE  WEZ  ROOTS_FILE  AGENT_FILE
+#    WZ_DIR  WZ_LIB(optional override)  WEZ  ROOTS_FILE  AGENT_FILE
+#  launch_agent plays $WZ_DIR/splash.sh (walking-cat) before the agent boots.
 # =============================================================================
 
 # ---- ANSI palette (D-013: bright yellow = input affordance only) ----
@@ -250,9 +251,12 @@ agent_label_of() {  # <id> -> registry label, fallback id
 launch_agent() {  # launch_agent <name> <root> <agent-index>
   local name="$1" root="$2" idx="$3"
   local exe="${A_EXE[$idx]}" mode="${A_MODE[$idx]}" flag="${A_FLAG[$idx]}" clear="${A_CLEAR[$idx]}"
+  local label="${A_LABEL[$idx]}"
   local safe_root="${root//\'/\'\\\'\'}"
   local safe_exe="${exe//\'/\'\\\'\'}"
-  local cmd="cat '$SPLASH_FILE' 2>/dev/null; sleep 0.3"
+  local safe_name="${name//\'/\'\\\'\'}"
+  local safe_label="${label//\'/\'\\\'\'}"
+  local cmd="zsh '$WZ_DIR/splash.sh' '$safe_name' '$safe_label'"
   [[ "$clear" == "1" ]] && cmd+="; clear"
   if [[ "$mode" == "flag" && -n "$flag" ]]; then
     cmd+="; exec '$safe_exe' $flag '$safe_root'"

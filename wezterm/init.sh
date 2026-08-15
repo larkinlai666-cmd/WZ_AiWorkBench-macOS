@@ -18,7 +18,6 @@ set -u
 WZ_DIR="$HOME/.config/wezterm"
 ROOTS_FILE="${WZ_ROOTS_FILE:-$WZ_DIR/workbench/desk-roots.tsv}"
 AGENT_FILE="${WZ_AGENTS_FILE:-$WZ_DIR/workbench/agents.tsv}"
-SPLASH_FILE="$WZ_DIR/splash.txt"
 WEZ="$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")"
 
 source "${WZ_LIB:-$WZ_DIR/wzlib.zsh}"

@@ -47,6 +47,15 @@ else
   FAIL=1
 fi
 
+say "== splash animation =="
+if python3 scripts/splash_visual_check.py >/tmp/wz-check-splash.log 2>&1; then
+  ok "splash animation PASS"
+else
+  bad "splash animation FAIL"
+  tail -n 15 /tmp/wz-check-splash.log
+  FAIL=1
+fi
+
 say "== show-keys parse =="
 if [ -n "$WEZ" ]; then
   if "$WEZ" --config-file "$DIR/wezterm/wezterm.lua" show-keys --lua >/dev/null 2>/tmp/wz-check-keys.err; then

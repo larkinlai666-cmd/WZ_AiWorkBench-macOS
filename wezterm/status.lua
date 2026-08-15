@@ -158,7 +158,7 @@ local function build_left_status(root, bound)
   chip(left, C.brand_bg, C.brand_fg, BRAND_TEXT, true)
   chip(left, C.gap_bg, C.gap_bg, BRAND_PATH_GAP)
   if not bound or not desk.is_strong_path(root) then
-    chip(left, C.path_empty_bg, C.path_empty_fg, " (no project - Cmd+Shift+N) ", false)
+    chip(left, C.path_empty_bg, C.path_empty_fg, " (no project - Cmd+T) ", false)
   else
     chip(left, C.path_bg, C.path_fg, " " .. (path_display(root) or root) .. " ", true)
   end

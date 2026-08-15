@@ -210,16 +210,17 @@ local function sh_quote(s)
   return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
 end
 
-local splash_file = home .. "/.config/wezterm/splash.txt"
+local splash_script = home .. "/.config/wezterm/splash.sh"
 
---- Splash-prefixed spawn args: cat splash (300ms) then exec the agent.
---- Line-based REPLs (clear=1) clear after splash so cat art never lingers.
+--- Splash-prefixed spawn args: walking-cat splash.sh animation then exec the
+--- agent. Line-based REPLs (clear=1) clear after splash so art never lingers.
 function M.splash_args(id, root)
   local entry = M.entry(id)
   if not entry then
     return nil
   end
-  local cmd = "cat " .. sh_quote(splash_file) .. " 2>/dev/null; sleep 0.3"
+  local name = root:match("([^/]+)$") or root
+  local cmd = "zsh " .. sh_quote(splash_script) .. " " .. sh_quote(name) .. " " .. sh_quote(entry.display)
   if entry.clear then
     cmd = cmd .. "; clear"
   end
