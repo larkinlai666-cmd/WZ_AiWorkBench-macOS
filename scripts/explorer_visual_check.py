@@ -45,9 +45,9 @@ def render() -> str:
         desk = os.path.join(td, "Desk")
         os.makedirs(os.path.join(desk, "src"))
         os.makedirs(os.path.join(desk, "docs"))
+        os.makedirs(os.path.join(desk, ".git"))
         with open(os.path.join(desk, "README.md"), "w") as f:
             f.write("# readme\n")
-        os.makedirs(os.path.join(desk, ".git"))
         fav = os.path.join(td, "favorites.tsv")
         roots = os.path.join(td, "roots.tsv")
         with open(roots, "w") as f:
@@ -60,8 +60,8 @@ def render() -> str:
         env["WZ_ROOTS_FILE"] = roots
         env["WZ_AGENTS_FILE"] = agentsf
         env["WZ_FAV_FILE"] = fav
-        # f = favorite toggle (repaint), q = quit
-        feed = "f\nq\n"
+        # 1 = descend into .git; b = bind refused; s = back to DESK; f = favorite; q = quit
+        feed = "1\nb\ns\nf\nq\n"
         p = subprocess.run(
             ["zsh", EXPLORER, desk],
             input=feed, capture_output=True, text=True, env=env,
@@ -70,11 +70,13 @@ def render() -> str:
             print("  FAIL  explorer.sh exited non-zero: " + str(p.returncode))
             print(p.stderr[:800])
             sys.exit(1)
-        return ANSI.sub("", p.stdout), desk
+        with open(roots) as f:
+            roots_content = f.read()
+        return ANSI.sub("", p.stdout), desk, roots_content
 
 
 def main():
-    text, desk = render()
+    text, desk, roots_content = render()
     lines = text.split("\n")
 
     frame_lines = [l for l in lines if l.startswith("  +")]
@@ -102,6 +104,10 @@ def main():
 
     # favorite toggle: after f, the repaint must show the ★ row
     check("★ favorites" in text or "★ Desk" in text, "favorite row appears after f toggle")
+
+    # b on a hidden dir is refused; desk-roots stays unpolluted
+    check("hidden dir refused" in text, "b refuses hidden dir (.git)")
+    check(".git" not in roots_content, "desk-roots unpolluted by hidden-dir bind")
 
     check("explorer>" in text, "explorer> prompt present")
 

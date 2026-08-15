@@ -30,7 +30,8 @@ local function is_help_pane(pane)
     local info = pane:get_foreground_process_info()
     if info and info.argv then
       for _, a in ipairs(info.argv) do
-        if tostring(a):find("cheatsheet.txt", 1, true) then
+        local s = tostring(a)
+        if s:find("wz-help-pane", 1, true) or s:find("cheatsheet.txt", 1, true) then
           hit = true
           return
         end
@@ -85,7 +86,7 @@ function M.toggle(window, pane)
         "/bin/zsh",
         "-l",
         "-c",
-        "cat " .. sh_quote(cheatsheet_file) .. " 2>/dev/null; exec zsh -l",
+        "cat " .. sh_quote(cheatsheet_file) .. " 2>/dev/null; exec -a wz-help-pane zsh -l",
       },
       cwd = wezterm.home_dir,
     })

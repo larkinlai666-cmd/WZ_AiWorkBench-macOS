@@ -130,7 +130,7 @@ local function read_map()
       local name, path, agent = line:match("^([^\t]+)\t([^\t]+)\t*([^\t]*)$")
       if name and path then
         path = M.normalize(path)
-        if path and M.is_strong_path(path) and not M.is_reserved_name(name) then
+        if path and M.is_strong_path(path) and not M.is_reserved_name(name) and name:sub(1, 1) ~= "." then
           map[name] = { path = path, agent = agent ~= "" and agent or nil }
         end
       end
@@ -262,7 +262,7 @@ function M.set_root(name, path, agent)
   if not name or name == "" or not path then
     return false
   end
-  if M.is_reserved_name(name) or M.is_weak_path(path) then
+  if M.is_reserved_name(name) or name:sub(1, 1) == "." or M.is_weak_path(path) then
     return false
   end
   local map = read_map()

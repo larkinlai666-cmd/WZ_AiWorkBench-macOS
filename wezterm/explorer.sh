@@ -114,6 +114,10 @@ bind_view_as_desk() {  # write VIEW into desk-roots (update row if name exists)
     hint="weak path refused — never a project root"
     return
   fi
+  if [[ "$name" == .* ]]; then
+    hint="hidden dir refused — metadata never a project root (use gd for AI here)"
+    return
+  fi
   local found=0
   local tmpf
   tmpf=$(mktemp /tmp/wz-roots.XXXXXX)

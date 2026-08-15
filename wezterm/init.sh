@@ -40,7 +40,7 @@ load_tasks() {
   local name ppath agent
   if [[ -f "$ROOTS_FILE" ]]; then
     while IFS=$'\t' read -r name ppath agent; do
-      [[ -z "$name" || "$name" == \#* ]] && continue
+      [[ -z "$name" || "$name" == \#* || "$name" == .* ]] && continue
       ppath="${ppath%/}"
       [[ -d "$ppath" ]] || continue
       TASKS_NAME+=("$name")
