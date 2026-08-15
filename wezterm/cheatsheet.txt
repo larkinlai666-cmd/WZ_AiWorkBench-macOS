@@ -8,7 +8,7 @@
   Cmd+F3           Init 面板
   Cmd+F4           关闭当前窗格（有确认）
   Cmd+F6           三栏 AI 桌（agent + shell + 监视）
-  Cmd+F7           Explorer 侧栏（当前任务根）
+  Cmd+F7           Explorer 常驻侧栏（当前页签左侧展开，绑定任务根；再按 = 聚焦 + 就地刷新）
   Cmd+R            重载配置（WezTerm 默认）
 
 【F 键直按 · 与 Windows 同键位】

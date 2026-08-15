@@ -9,7 +9,8 @@
 #    - b bind VIEW as DESK · w shell tab · p copy path · f favorite · q quit
 #    - D-013: bright yellow = input affordance only
 #    - D-012: agent spawned -> panel exits -> sole-pane tab closes
-#  Usage: explorer.sh [DESK]   (DESK = task root, passed by Cmd+Shift+E)
+#  Usage: explorer.sh [DESK] [VIEW0]   (DESK = task root; VIEW0 = initial
+#  view when it lives inside DESK — sidebar passes the focused pane's cwd)
 # =============================================================================
 emulate -L zsh
 set -u
@@ -21,6 +22,7 @@ FAV_FILE="${WZ_FAV_FILE:-$WZ_DIR/workbench/favorites.tsv}"
 WEZ="${WEZ:-$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")}"
 
 source "${WZ_LIB:-$WZ_DIR/wzlib.zsh}"
+WZ_MIN_COLS=28   # sidebar rail renders down to 28 cols (0.21 rail of 133-col window)
 
 # ---- state ----
 DESK="${1:-}"
@@ -339,6 +341,10 @@ dispatch() {
 load_agents
 resolve_desk
 VIEW="$DESK"
+if [[ -n "${2:-}" && -d "${2%/}" ]]; then
+  VIEW="${2%/}"
+  under_desk || VIEW="$DESK"
+fi
 load_favs
 list_view
 

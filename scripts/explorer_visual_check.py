@@ -40,7 +40,7 @@ def check(cond: bool, msg: str):
         failures.append(msg)
 
 
-def render() -> str:
+def render(cols: int = 80) -> tuple:
     with tempfile.TemporaryDirectory() as td:
         desk = os.path.join(td, "Desk")
         os.makedirs(os.path.join(desk, "src"))
@@ -60,6 +60,7 @@ def render() -> str:
         env["WZ_ROOTS_FILE"] = roots
         env["WZ_AGENTS_FILE"] = agentsf
         env["WZ_FAV_FILE"] = fav
+        env["WZ_COLS"] = str(cols)
         # 1 = descend into .git; b = bind refused; s = back to DESK; f = favorite; q = quit
         feed = "1\nb\ns\nf\nq\n"
         p = subprocess.run(
@@ -75,8 +76,30 @@ def render() -> str:
         return ANSI.sub("", p.stdout), desk, roots_content
 
 
+def grid_checks(cols: int, first: str):
+    """Rail-width matrix: 45 = sidebar width (0.21 rail), 80 = full tab."""
+    text, desk, roots_content = render(cols)
+    tot = cols - 6 + 4
+    lines = text.split("\n")
+    frame_lines = [l for l in lines if l.startswith("  +")]
+    check(all(disp(l.rstrip()) == tot for l in frame_lines),
+          f"[{cols}] all box frames {tot} cells wide ({len(frame_lines)} lines)")
+    interior = [l for l in lines if l.startswith("  |")]
+    check(all(l.rstrip().endswith("|") and disp(l.rstrip()) == tot for l in interior),
+          f"[{cols}] all interior lines flush-right at {tot} cells ({len(interior)} lines)")
+    check("EXPLORER" in text and "Desk" in text, f"[{cols}] HEADER zone renders")
+    check("1 LOCATION" in text and "2 FILES" in text and "3 COMMAND" in text,
+          f"[{cols}] LOCATION/FILES/COMMAND zones render")
+    check("explorer>" in text, f"[{cols}] explorer> prompt present")
+    check("seg_w" not in text, f"[{cols}] no zsh local-leak artifacts in output")
+    check(".git" not in roots_content, f"[{cols}] desk-roots unpolluted by hidden-dir bind")
+    return text
+
+
 def main():
-    text, desk, roots_content = render()
+    # rail-width matrix: 45 ≈ 0.21 sidebar rail of a 215-col window; 80 full tab
+    grid_checks(45, "")
+    text, desk, roots_content = render(80)
     lines = text.split("\n")
 
     frame_lines = [l for l in lines if l.startswith("  +")]

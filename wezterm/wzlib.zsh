@@ -28,7 +28,7 @@ typeset INNER=74
 typeset TOT=78
 refresh_size() {
   local cols=80
-  local sz
+  local sz minc="${WZ_MIN_COLS:-54}"
   if [[ -n "${WZ_COLS:-}" && "${WZ_COLS}" =~ '^[0-9]+$' ]]; then
     cols=$WZ_COLS
   else
@@ -37,7 +37,7 @@ refresh_size() {
       cols=${sz##* }
     fi
   fi
-  (( cols < 54 )) && cols=54
+  (( cols < minc )) && cols=$minc
   typeset -g COLS=$cols
   typeset -g INNER=$(( cols - 6 ))
   typeset -g TOT=$(( INNER + 4 ))   # every box line = INNER+4 display cells
@@ -110,6 +110,10 @@ box_top() {  # box_top <title> <color>
   local t=" $title "
   local tw
   tw=$(dwidth "$t")
+  if (( tw > INNER )); then
+    t=$(pad "$t" $INNER)   # truncate over-long titles (narrow rails stay flush)
+    tw=$INNER
+  fi
   local fill=$(( INNER - tw ))
   (( fill < 0 )) && fill=0
   local left=$(( fill / 2 ))
@@ -148,14 +152,15 @@ key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
   local colr="$1"; shift
   local seg tok v
   local -a texts=() colors=()
+  local budget used i w padc k room s seg_w
   for seg in "$@"; do
     tok="${seg%%:*}"
     v="${seg#*:}"
     texts+=("$v")
     colors+=("$tok")
   done
-  local budget=$(( INNER - 1 ))
-  local used=0 i w
+  budget=$(( INNER - 1 ))
+  used=0
   for (( i = 1; i <= ${#texts}; i++ )); do
     w=$(dwidth "${texts[$i]}")
     used=$(( used + w ))
@@ -163,13 +168,12 @@ key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
   if (( used > budget )); then
     # squeeze from the LAST segment backward until the row fits:
     # truncate the current segment when the rest fits, else drop it entirely
-    local k=${#texts}
+    k=${#texts}
     while (( used > budget )) && (( k >= 1 )); do
-      local seg_w
       seg_w=$(dwidth "${texts[$k]}")
-      local room=$(( budget - (used - seg_w) ))
+      room=$(( budget - (used - seg_w) ))
       if (( room >= 1 )); then
-        local s="${texts[$k]}"
+        s="${texts[$k]}"
         while (( $(dwidth "$s") > room )) && (( ${#s} > 1 )); do
           s="${s[1,-2]}"
         done

@@ -26,7 +26,7 @@ V1 用 Cmd+Shift+字母（D/E/H/W）。`show-keys --lua` 实测发现：**WezTer
 |---|---|---|---|
 | 新 Init 面板页签 | Cmd+T | F3 / Fn+F3 | 已 GUI 实测通过 |
 | 三栏 AI 桌 | Cmd+F6 | F6 / Fn+F6 | 已 GUI 实测通过（先弹 agent 选择器） |
-| Explorer 侧栏 | Cmd+F7 | F7 / Fn+F7 | 已 GUI 实测通过（含 agent 页签场景） |
+| Explorer 常驻侧栏 | Cmd+F7 | F7 / Fn+F7 | 已 GUI 实测通过（当前页签左侧展开，绑定任务根，singleton 聚焦刷新） |
 | 速查面板 | Cmd+F1 | F1 / Fn+F1 | 已 GUI 实测通过（同页签开关） |
 | 关闭窗格 | Cmd+F4 | F4 / Fn+F4 | 实测通过（确认弹窗） |
 | 重载配置 | Cmd+R（默认） | F5 / Fn+F5 | 实测通过 |
