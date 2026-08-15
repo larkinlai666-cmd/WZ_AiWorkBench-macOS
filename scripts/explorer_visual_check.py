@@ -77,9 +77,10 @@ def render(cols: int = 80) -> tuple:
         env["WZ_FAV_FILE"] = fav
         env["WZ_COLS"] = str(cols)
         env["OPEN_CMD"] = "/bin/echo"   # neutralize real Finder/open in harness
-        # 1 = descend into .git; b = bind refused; s = back to DESK;
-        # f = favorite; o1 = system-open favorite dir; o6 = open README; q = quit
-        feed = "1\nb\ns\nf\no1\no6\nq\n"
+        # 1 = descend into .git (numbers map to dirs+files only, favs excluded);
+        # b = bind refused; s = back to DESK; f = favorite DESK;
+        # o2 = system-open docs dir; o5 = system-open exec_tool.sh; q = quit
+        feed = "1\nb\ns\nf\no2\no5\nq\n"
         p = subprocess.run(
             ["zsh", EXPLORER, desk],
             input=feed, capture_output=True, text=True, env=env,
@@ -177,14 +178,17 @@ def main():
     check("3 COMMAND" in text, "3 COMMAND zone renders")
     check("left DESK tree" not in text, "no out-of-tree warning at entry")
 
-    # numbered entries render (idx column right-aligned, no brackets — upstream style)
-    check("|   1  " in clean and "|   2  " in clean and "|   3  " in clean,
-          "numbered entries [1..3] render")
+    # numbered entries: numbers map to dirs+files ONLY (upstream Get-EntryByIndex)
+    check("|   1  .git/" in clean, "number 1 maps to first dir (.git), not favorite")
     check("src/" in text and "docs/" in text, "dirs listed with trailing slash")
     check("README.md" in text, "files listed")
 
-    # favorite toggle: after f, the repaint must show the ★ row
-    check("★ favorites" in text or "★ Desk" in text, "favorite row appears after f toggle")
+    # favorite toggle: after f, the repaint must show an unnumbered ★ row
+    check("★ favorites" in text, "favorites header appears after f toggle")
+    fav_line = next((l for l in clean.split("\n") if "★" in l and "favorites" not in l), "")
+    check(fav_line != "" and "Desk/" in fav_line, "favorite row shows name with trailing slash")
+    check(fav_line != "" and "|   1" not in fav_line and "[1]" not in fav_line,
+          "favorite row carries NO number (numbers never shift)")
 
     # b on a hidden dir is refused; desk-roots stays unpolluted
     check("hidden dir refused" in text, "b refuses hidden dir (.git)")
@@ -195,6 +199,8 @@ def main():
     exec_line = next((l for l in text.split("\n") if "exec_tool.sh" in l), "")
     check(exec_line != "" and "]8;;" not in exec_line,
           "executable row carries no hyperlink")
+    fav_line = next((l for l in text.split("\n") if "Desk/" in l and "favorites" not in l), "")
+    check(fav_line != "" and "]8;;file://" in fav_line, "favorite row is clickable (OSC8)")
 
     # long-name truncation: head kept, extension kept, '~' present
     check("very" in text and ".txt" in text,
@@ -203,7 +209,7 @@ def main():
 
     # o<num> system-open branch (OPEN_CMD neutralized → hint text)
     check("Finder:" in text, "o<num> opens dir via system open (Finder)")
-    check("opened README.md" in text, "o<num> opens file via default app")
+    check("opened " in text, "o<num> opens file via default app")
 
     check("explorer>" in text, "explorer> prompt present")
 

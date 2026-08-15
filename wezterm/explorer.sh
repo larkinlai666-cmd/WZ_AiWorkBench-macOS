@@ -225,6 +225,23 @@ render_entry_row() {
   print -r "${colr}|${X}"
 }
 
+# fav_row <name> <path> <color> — unnumbered ★ row, clickable (OSC8)
+# numbers ALWAYS map to dirs+files only (upstream Get-EntryByIndex semantics)
+fav_row() {
+  local name="$1" path="$2" colr="$3"
+  local display w padc maxname
+  maxname=$(( INNER - 5 ))
+  (( maxname < 6 )) && maxname=6
+  display=$(format_name_fit "$name" $maxname 1)
+  w=$(dwidth "$display")
+  padc=$(( INNER - 3 - w ))
+  (( padc < 0 )) && padc=0
+  print -rn "${colr}  |${X} ${Y}★${X} "
+  osc8_link "$path" "$display" "dir"
+  print -rn "${D}$(pad '' $padc)${X}"
+  print -r "${colr}|${X}"
+}
+
 render() {
   print -n $'\e[2J\e[H'
   refresh_size
@@ -261,14 +278,13 @@ render() {
   # ----- 2 FILES (cyan) -----
   box_top "2 FILES" "$C"
   local idx=1 i
-  # favorites first
+  # favorites first (★ prefix, NOT numbered — numbers always map to dirs+files)
   if (( ${#FAV_NAME} > 0 )); then
-    key_row "$C" "D:★ favorites" "D:  " "D:(f toggles)"
+    key_row "$C" "D:★ favorites" "D:  " "D:(f toggles · click opens)"
     box_rule "$C"
     i=1
     while (( i <= ${#FAV_NAME} )); do
-      key_row "$C" "Y:[$idx]" "G: ★ ${FAV_NAME[$i]}" "D:  " "D:$(pad_tail "${FAV_PATH[$i]}" $(( INNER - 14 )))"
-      idx=$(( idx + 1 ))
+      fav_row "${FAV_NAME[$i]}" "${FAV_PATH[$i]}" "$C"
       i=$(( i + 1 ))
     done
   fi
@@ -294,7 +310,7 @@ render() {
 
   # ----- 3 COMMAND (dark gray) -----
   box_top "3 COMMAND  << type keys here" "$D"
-  key_row "$D" "Y: >_" "W:  number = enter · o<num> = Finder/open · Cmd+Click 链接"
+  key_row "$D" "Y: >_" "W:  number = enter · o<num> = Finder/open · 单击条目打开"
   box_rule "$D"
   key_row "$D" "Y:[0/..]" "G: parent  " "Y:[s]" "G: back to DESK  " "Y:[r]" "G: refresh  " "Y:[a]" "D: auto"
   key_row "$D" "Y:[g]" "W: AI@VIEW  " "Y:[gd]" "W: AI@DESK  " "Y:[b]" "G: bind VIEW  " "Y:[w]" "G: shell"
@@ -352,22 +368,17 @@ dispatch() {
       n=$line
     fi
     local total t ek ep
-    total=$(( ${#FAV_NAME} + ${#DIRS} + ${#FILES} ))
+    total=$(( ${#DIRS} + ${#FILES} ))
     if (( n < 1 || n > total )); then
       hint="no entry #$n (1-$total)"
       return
     fi
     t=$n
-    if (( t <= ${#FAV_NAME} )); then
-      ek="dir"; ep="${FAV_PATH[$t]}"
+    if (( t <= ${#DIRS} )); then
+      ek="dir"; ep="$VIEW/${DIRS[$t]}"
     else
-      t=$(( t - ${#FAV_NAME} ))
-      if (( t <= ${#DIRS} )); then
-        ek="dir"; ep="$VIEW/${DIRS[$t]}"
-      else
-        t=$(( t - ${#DIRS} ))
-        ek="file"; ep="$VIEW/${FILES[$t]}"
-      fi
+      t=$(( t - ${#DIRS} ))
+      ek="file"; ep="$VIEW/${FILES[$t]}"
     fi
     if (( force_open == 1 )); then
       open_default "$ep" "$ek"    # folders → Finder, files → default app

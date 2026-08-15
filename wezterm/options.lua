@@ -80,14 +80,15 @@ function M.apply(config)
   config.ime_preedit_rendering = "Builtin"
 
   ------------------------------------------------------------------
-  -- Mouse: plain click completes selection only; open link = Cmd+Click
-  -- (D-014 upstream semantics, launcher extensions never become links)
+  -- Mouse: plain click on a link opens it (falls back to completing
+  -- selection); Cmd+Click forces open. D-014: launcher extensions
+  -- never become links (gated in wzlib is_linkable).
   ------------------------------------------------------------------
   config.hide_mouse_cursor_when_typing = true
   config.swallow_mouse_click_on_pane_focus = false
-  config.swallow_mouse_click_on_window_focus = true
+  config.swallow_mouse_click_on_window_focus = false
   config.mouse_bindings = {
-    { event = { Up = { streak = 1, button = "Left" } }, mods = "NONE", action = wezterm.action.CompleteSelection("Clipboard") },
+    { event = { Up = { streak = 1, button = "Left" } }, mods = "NONE", action = wezterm.action.CompleteSelectionOrOpenLinkAtMouseCursor("PrimarySelection") },
     { event = { Up = { streak = 1, button = "Left" } }, mods = "SUPER", action = wezterm.action.OpenLinkAtMouseCursor },
     { event = { Up = { streak = 1, button = "Middle" } }, mods = "NONE", action = wezterm.action.OpenLinkAtMouseCursor },
     { event = { Up = { streak = 1, button = "Right" } }, mods = "NONE", action = wezterm.action.PasteFrom("Clipboard") },

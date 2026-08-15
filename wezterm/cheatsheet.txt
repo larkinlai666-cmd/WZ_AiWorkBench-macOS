@@ -34,16 +34,16 @@
   wz> q               退出面板（关标签）
 
 【Explorer 常驻侧栏（静态屏 · 行输入）】
-  explorer> 数字      进入目录 / 打开文件 / 跳收藏
+  explorer> 数字      进入目录 / 打开文件（只对文件列表编号）
   explorer> o<数字>   系统默认打开（目录→Finder，文件→默认应用）
-  Cmd+Click 条目      直接打开该文件/文件夹（可执行文件除外）
+  单击条目            直接打开该文件/文件夹（可执行文件除外）
   explorer> 0/..      上级目录
   explorer> s         回到 DESK 根
   explorer> g         AI@当前视图    gd = AI@DESK
   explorer> b         绑定当前视图为任务根
   explorer> w         纯 shell 页签
   explorer> p         复制路径
-  explorer> f         收藏/取消收藏
+  explorer> f         收藏/取消收藏（★ 行不占编号，单击可打开）
   explorer> r         手动刷新
   explorer> a         自动刷新开关（变化时自动重绘，不闪屏）
   explorer> q         退出侧栏（仅关侧栏，不动其他窗格）
