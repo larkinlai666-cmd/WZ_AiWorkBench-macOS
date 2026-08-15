@@ -47,8 +47,8 @@ function M.read_registry()
   local rows = {}
   local f = io.open(agents_file, "r")
   if f then
-    for line in f:lines() do
-      line = line:gsub("^\239\187\191", "")
+    for raw in f:lines() do
+      local line = raw:gsub("^\239\187\191", "")
       line = line:match("^%s*(.-)%s*$") or ""
       if line ~= "" and not line:match("^#") then
         local id, label, exe, mode, flag, clear = line:match("^([^\t]+)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")

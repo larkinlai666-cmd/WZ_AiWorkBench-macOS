@@ -227,6 +227,7 @@ render_entry_row() {
 
 # fav_row <name> <path> <color> — unnumbered ★ row, clickable (OSC8)
 # numbers ALWAYS map to dirs+files only (upstream Get-EntryByIndex semantics)
+# H4: dead favorite (target removed) renders red ✗, no hyperlink
 fav_row() {
   local name="$1" path="$2" colr="$3"
   local display w padc maxname
@@ -236,6 +237,12 @@ fav_row() {
   w=$(dwidth "$display")
   padc=$(( INNER - 3 - w ))
   (( padc < 0 )) && padc=0
+  if [[ ! -d "$path" ]]; then
+    print -rn "${colr}  |${X} ${R}✗${X} ${R}${display}${X}"
+    print -rn "${D}$(pad '' $padc)${X}"
+    print -r "${colr}|${X}"
+    return
+  fi
   print -rn "${colr}  |${X} ${Y}★${X} "
   osc8_link "$path" "$display" "dir"
   print -rn "${D}$(pad '' $padc)${X}"
@@ -327,7 +334,7 @@ dispatch() {
   line="${line// /}"
   [[ -z "$line" ]] && return
   case "$line" in
-    q|Q) print "${D}  left explorer.${X}"; exit 0 ;;
+    q|Q) print "${D}  left explorer.${X}"; clean_exit 0 ;;
     r|R) list_view; load_favs; return ;;
     a|A) if (( auto == 0 )); then auto=1; else auto=0; fi; return ;;
     0|..|u|U)
@@ -398,6 +405,7 @@ dispatch() {
 # =============================================================================
 load_agents
 resolve_desk
+panel_guard "explorer"
 VIEW="$DESK"
 if [[ -n "${2:-}" && -d "${2%/}" ]]; then
   VIEW="${2%/}"
@@ -426,7 +434,7 @@ while true; do
       fi
     done
   else
-    read -r line || { print ""; exit 0 }
+    read -r line || { print ""; clean_exit 0 }
   fi
   dispatch "$line"
 done

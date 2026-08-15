@@ -297,7 +297,7 @@ wizard() {
         box_bottom "$M"
         print ""
         print -n "${Y}  project name > ${X}"
-        read -r line || { print ""; exit 0 }
+        read -r line || { print ""; clean_exit 0 }
         line="${line// /}"
         [[ -z "$line" || "$line" == "q" || "$line" == "Q" ]] && { hint="wizard cancelled"; return; }
         if is_reserved "$line"; then w_err="reserved name '$line' — pick another"; continue; fi
@@ -325,12 +325,12 @@ wizard() {
         box_bottom "$M"
         print ""
         print -n "${Y}  location > ${X}"
-        read -r line || { print ""; exit 0 }
+        read -r line || { print ""; clean_exit 0 }
         [[ "$line" == "q" || "$line" == "Q" ]] && { hint="wizard cancelled"; return; }
         [[ "$line" == "b" || "$line" == "B" ]] && { w_step=1; continue; }
         if [[ "$line" == "0" ]]; then
           print -n "${Y}  parent dir > ${X}"
-          read -r line || { print ""; exit 0 }
+          read -r line || { print ""; clean_exit 0 }
           [[ "$line" == "q" || "$line" == "Q" ]] && { hint="wizard cancelled"; return; }
           [[ "$line" == "b" || "$line" == "B" ]] && continue
           line="${line/#\~/$HOME}"
@@ -375,7 +375,7 @@ wizard() {
         box_bottom "$M"
         print ""
         print -n "${Y}  agent (Enter = default) > ${X}"
-        read -r line || { print ""; exit 0 }
+        read -r line || { print ""; clean_exit 0 }
         line="${line// /}"
         [[ "$line" == "q" || "$line" == "Q" ]] && { hint="wizard cancelled"; return; }
         [[ "$line" == "b" || "$line" == "B" ]] && { w_step=2; continue; }
@@ -403,7 +403,7 @@ wizard() {
         box_bottom "$M"
         print ""
         print -n "${Y}  confirm (y = create & launch) > ${X}"
-        read -r line || { print ""; exit 0 }
+        read -r line || { print ""; clean_exit 0 }
         line="${line// /}"
         [[ "$line" == "q" || "$line" == "Q" ]] && { hint="wizard cancelled"; return; }
         [[ "$line" == "b" || "$line" == "B" ]] && { w_step=3; continue; }
@@ -427,7 +427,7 @@ step2_input() {
   local line def_idx
   def_idx=$(default_agent_idx)
   print -n "${Y}  agent 1-${#A_ID} (Enter = default, q = cancel) ${X}"
-  read -r line || { print ""; exit 0 }
+  read -r line || { print ""; clean_exit 0 }
   line="${line// /}"
   if [[ -z "$line" ]]; then
     launch_agent "${TASKS_NAME[$pending_idx]}" "${TASKS_PATH[$pending_idx]}" $def_idx
@@ -449,12 +449,12 @@ step2_input() {
 step1_input() {
   local line
   print -n "${Y}  wz> ${X}"
-  read -r line || { print ""; exit 0 }
+  read -r line || { print ""; clean_exit 0 }
   line="${line// /}"
   [[ -z "$line" ]] && return
   if [[ "$line" == "q" || "$line" == "Q" ]]; then
     print "${D}  left panel.${X}"
-    exit 0
+    clean_exit 0
   fi
   if [[ "$line" == "c" || "$line" == "C" ]]; then wizard; return; fi
   if [[ "$line" == "r" || "$line" == "R" ]]; then load_agents; load_tasks; hint="refreshed"; return; fi
@@ -517,6 +517,7 @@ step1_input() {
 # =============================================================================
 load_agents
 load_tasks
+panel_guard "init panel"
 
 while true; do
   now="$(date '+%Y-%m-%d %H:%M')"

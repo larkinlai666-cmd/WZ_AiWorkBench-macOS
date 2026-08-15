@@ -19,6 +19,49 @@ typeset R=$'\e[31;1m'    # red — errors / out-of-tree warnings
 typeset E=$'\e[32;1m'    # green — success / (default) tag
 typeset X=$'\e[0m'
 
+# =============================================================================
+# H2 crash guard — an uncaught error must never leave a silent dead pane.
+# Panels call `panel_guard <name>` once at startup and `clean_exit [code]`
+# for every intentional exit. Any other exit path (set -u violation, syntax
+# error, unhandled failure) trips TRAPEXIT with the flag unset -> visible
+# red stop + wait for Enter instead of a vanishing pane.
+# =============================================================================
+typeset WZ_PANEL_NAME=""
+typeset WZ_CLEAN_EXIT=0
+
+# TRAPEXIT MUST live at top level (source context): zsh treats an EXIT trap
+# defined INSIDE a function as function-scoped — it would fire the moment
+# panel_guard() returns and its `read` would eat the panel's stdin.
+TRAPEXIT() {
+  local code=$?
+  # main shell only — $(...) substitution subshells exit constantly and must
+  # never trip the guard (their output would corrupt rendered frames)
+  if (( ZSH_SUBSHELL == 0 )) && [[ -n "$WZ_PANEL_NAME" ]] && (( WZ_CLEAN_EXIT == 0 )); then
+    print ""
+    print -r $'\e[31m'"  ! ${WZ_PANEL_NAME} crashed (exit ${code}) — pane kept open for reading"$'\e[0m'
+    print -rn $'\e[33m'"  press Enter to close "$'\e[0m'
+    read -r 2>/dev/null
+  fi
+}
+
+panel_guard() {  # activate the crash guard for this panel
+  WZ_PANEL_NAME="${1:-panel}"
+}
+
+clean_exit() {  # intentional panel exit — bypasses the crash trap
+  WZ_CLEAN_EXIT=1
+  exit "${1:-0}"
+}
+
+# fatal <msg> — visible red stop for known-fatal conditions
+fatal() {
+  print ""
+  print -r $'\e[31m'"  ! ${WZ_PANEL_NAME:-panel}: $1"$'\e[0m'
+  print -rn $'\e[33m'"  press Enter to close "$'\e[0m'
+  read -r 2>/dev/null
+  clean_exit 1
+}
+
 # ---- terminal size ----
 # refresh_size re-reads the live terminal width on every repaint so panels
 # adapt to window resizes (static-screen contract: repaint on state change).
@@ -49,6 +92,12 @@ refresh_size
 # =============================================================================
 dwidth() {
   local s="$1" w=0
+  # P3 fast path: pure-ASCII strings (the overwhelming majority of file
+  # names) need no per-char wcwidth walk — zsh ${#s} is already the answer.
+  if [[ "$s" != *[^$'\x01'-$'\x7f']* ]]; then
+    print -n ${#s}
+    return
+  fi
   local c
   for c in ${(s::)s}; do
     case "$c" in
@@ -217,15 +266,30 @@ format_name_fit() {
 }
 
 # ---- filesystem change detection (event-style redraw; no kernel watcher) ----
+# P2: zero-fork fingerprint via zsh/stat builtin — name+size+mtime of every
+# entry (incl. hidden), no ls/md5 child processes on the poll loop.
+# TRAP: full `zmodload zsh/stat` shadows /usr/bin/stat with an incompatible
+# builtin (BSD `stat -f` breaks everywhere) — load ONLY the zstat name.
+zmodload -F zsh/stat b:zstat 2>/dev/null
 typeset FS_SNAP_PREV=""
-fs_snapshot() {  # <dir> -> fingerprint (ls -lTA | md5; raw fallback)
-  local d="$1" out
-  out=$(ls -lTA "$d" 2>/dev/null)
-  if command -v md5 >/dev/null 2>&1; then
-    print -n "$out" | md5 -q 2>/dev/null
-  else
+fs_snapshot() {  # <dir> -> fingerprint
+  local d="$1"
+  if (( $+builtins[zstat] )); then
+    local -a entries st
+    local e out=""
+    entries=("$d"/*(DN))
+    for e in $entries; do
+      st=()
+      if zstat -A st -- "$e" 2>/dev/null; then
+        # st indices: 8=size 10=mtime (full stat array)
+        out+="${e:t}:${st[8]}:${st[10]};"
+      fi
+    done
     print -n "$out"
+    return
   fi
+  # fallback: external ls (should not happen on stock macOS zsh)
+  ls -lTA "$d" 2>/dev/null
 }
 fs_snap_reset() { FS_SNAP_PREV="$(fs_snapshot "$1")"; }
 fs_changed() {  # <dir> -> 0 if changed since last reset
@@ -451,7 +515,7 @@ launch_agent() {  # launch_agent <name> <root> <agent-index>
     cmd+="; exec '$safe_exe'"
   fi
   "$WEZ" cli spawn --cwd "$root" -- /bin/zsh -lc "$cmd" >/dev/null 2>&1
-  exit 0
+  clean_exit 0
 }
 
 open_shell() {

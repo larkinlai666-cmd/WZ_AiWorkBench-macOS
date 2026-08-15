@@ -180,8 +180,9 @@ end
 
 function M.apply(config)
   wezterm.GLOBAL.macos_status_gen = STATUS_GEN
-  config.status_update_interval = 500
+  config.status_update_interval = 1000   -- P1: upstream cadence; desk map cached
 
+  local prune_tick = 0
   wezterm.on("update-status", function(window, pane)
     if wezterm.GLOBAL.macos_status_gen ~= STATUS_GEN then
       return
@@ -190,6 +191,13 @@ function M.apply(config)
       window:set_right_status("")
     end)
     paint_left(window, pane)
+    prune_tick = prune_tick + 1
+    if prune_tick >= 60 then   -- H3: sweep dead tab records ~once a minute
+      prune_tick = 0
+      pcall(function()
+        desk.prune_dead_tabs(window)
+      end)
+    end
   end)
 
   wezterm.on("format-tab-title", function(tab, tabs, panes, conf, hover, max_width)

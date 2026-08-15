@@ -19,10 +19,12 @@ warn(){ printf '  \033[33mWARN\033[0m %s\n' "$*"; }
 
 doctor() {
   say "== Doctor =="
+  local dfail=0
   if command -v wezterm >/dev/null 2>&1; then
     ok "wezterm: $(wezterm --version 2>/dev/null || echo unknown)"
   else
     bad "wezterm not on PATH"
+    dfail=1
   fi
   local found=0
   for a in codex deepseek kimi grok; do
@@ -43,10 +45,38 @@ doctor() {
     else
       bad "config parse failed:"
       sed 's/^/    /' /tmp/wz-mac-doctor.err | head -n 10
+      dfail=1
+    fi
+    # Q2: deployed runtime completeness — panel scripts + registry must exist
+    for req in init.sh explorer.sh wzlib.zsh splash.sh cheatsheet.txt; do
+      if [ -f "$TARGET/$req" ]; then
+        ok "runtime file: $req"
+      else
+        bad "runtime file missing: $req"
+        dfail=1
+      fi
+    done
+    if [ -f "$WORKBENCH_DIR/agents.tsv" ]; then
+      ok "agent registry present"
+    else
+      bad "agent registry missing: $WORKBENCH_DIR/agents.tsv"
+      dfail=1
+    fi
+    if [ -f "$ROOTS_FILE" ]; then
+      ok "desk-roots present"
+    else
+      bad "desk-roots missing: $ROOTS_FILE"
+      dfail=1
     fi
   else
     warn "no deployed config yet (run install)"
   fi
+  if [ "$dfail" -eq 0 ]; then
+    say "DOCTOR:PASS"
+  else
+    say "DOCTOR:FAIL"
+  fi
+  return "$dfail"
 }
 
 install() {

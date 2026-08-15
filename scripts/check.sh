@@ -47,6 +47,15 @@ else
   FAIL=1
 fi
 
+say "== desk semantics (lua unit) =="
+if python3 scripts/desk_semantics_check.py >/tmp/wz-check-desk.log 2>&1; then
+  ok "desk semantics PASS"
+else
+  bad "desk semantics FAIL"
+  tail -n 15 /tmp/wz-check-desk.log
+  FAIL=1
+fi
+
 say "== splash animation =="
 if python3 scripts/splash_visual_check.py >/tmp/wz-check-splash.log 2>&1; then
   ok "splash animation PASS"
@@ -139,6 +148,14 @@ if [ -f "$HOME/.config/wezterm/wezterm.lua" ]; then
 else
   warn_msg="no deployed config (~/.config/wezterm missing) — run ./install.sh"
   printf '  \033[33mWARN\033[0m %s\n' "$warn_msg"
+fi
+
+say "== install doctor =="
+if ./install.sh doctor 2>/dev/null | grep -q "DOCTOR:PASS"; then
+  ok "doctor PASS"
+else
+  bad "doctor FAIL (run ./install.sh doctor for detail)"
+  FAIL=1
 fi
 
 say ""

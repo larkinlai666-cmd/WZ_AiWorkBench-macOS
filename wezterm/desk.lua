@@ -21,7 +21,7 @@ function M.normalize(path)
     return nil
   end
   path = tostring(path)
-  path = path:gsub("^file:///", ""):gsub("^file://", "")
+  path = path:gsub("^file://", "")   -- keeps the leading "/" of the path part
   path = path:gsub("%%20", " ")
   path = path:gsub("\\", "/")
   path = path:gsub("/+$", "")
@@ -117,14 +117,31 @@ function M.is_strong_path(path)
   return not M.is_weak_path(path)
 end
 
+-- P1: read cache with a short time window — the status tick (1s) no longer
+-- re-reads the TSV on every repaint. Any write invalidates immediately.
+local map_cache = nil
+local map_cache_at = 0
+local MAP_TTL = 2.0
+
+local function invalidate_map()
+  map_cache = nil
+  map_cache_at = 0
+end
+
 local function read_map()
+  local now = os.clock()
+  if map_cache and (now - map_cache_at) < MAP_TTL and (now - map_cache_at) >= 0 then
+    return map_cache
+  end
   local map = {}
   local f = io.open(roots_file, "r")
   if not f then
+    map_cache = map
+    map_cache_at = now
     return map
   end
-  for line in f:lines() do
-    line = line:gsub("^\239\187\191", "")
+  for raw in f:lines() do
+    local line = raw:gsub("^\239\187\191", "")
     line = line:match("^%s*(.-)%s*$") or ""
     if line ~= "" and not line:match("^#") then
       local name, path, agent = line:match("^([^\t]+)\t([^\t]+)\t*([^\t]*)$")
@@ -137,11 +154,16 @@ local function read_map()
     end
   end
   f:close()
+  map_cache = map
+  map_cache_at = now
   return map
 end
 
+-- H1: atomic write — temp file + rename, never truncate in place (upstream
+-- L-3 discipline; zsh side already does mktemp+mv, Lua side now matches).
 local function write_map(map)
-  local f = io.open(roots_file, "w")
+  local tmp = roots_file .. ".tmp." .. tostring(os.time()) .. tostring(math.random(10000, 99999))
+  local f = io.open(tmp, "w")
   if not f then
     return false
   end
@@ -160,7 +182,18 @@ local function write_map(map)
     end
   end
   f:close()
+  local ok = os.rename(tmp, roots_file)
+  if not ok then
+    pcall(os.remove, tmp)
+    return false
+  end
+  invalidate_map()
   return true
+end
+
+--- External invalidation hook (config reload, panel writes observed late)
+function M.invalidate_cache()
+  invalidate_map()
 end
 
 function M.ensure_roots_dir()
@@ -270,6 +303,9 @@ function M.set_root(name, path, agent)
   for k, entry in pairs(map) do
     if k ~= name and entry.path and entry.path:lower() == pl then
       map[k] = nil
+      if wezterm.GLOBAL.macos_desk then   -- evict stale GLOBAL alias too
+        wezterm.GLOBAL.macos_desk[k] = nil
+      end
     end
   end
   map[name] = { path = path, agent = agent or map[name] and map[name].agent }
@@ -423,6 +459,43 @@ end
 function M.ensure(window, pane)
   local _, root = M.resolve_active_for_hud(window, pane)
   return M.project_label(root), root
+end
+
+-- H3: prune GLOBAL per-tab records whose tab no longer exists (tab close
+-- leaves macos_tab_desk / macos_help_tabs / macos_sidebar_tabs entries
+-- behind: slow leak + stale hit risk if the mux ever reuses an id).
+function M.prune_dead_tabs(window)
+  local live = {}
+  local ok = pcall(function()
+    local mux = window:mux_window()
+    if not mux then
+      return
+    end
+    for _, ti in ipairs(mux:tabs_with_info() or {}) do
+      local id = extract_tab_id(ti.tab)
+      if not id and ti.tab_id then
+        id = ti.tab_id
+      end
+      if id then
+        live[tostring(id)] = true
+      end
+    end
+  end)
+  if not ok or next(live) == nil then
+    return   -- never wipe on enumeration failure
+  end
+  for _, key in ipairs({ "macos_tab_desk", "macos_help_tabs", "macos_sidebar_tabs" }) do
+    local g = wezterm.GLOBAL[key]
+    if g then
+      local keep = {}
+      for id, v in pairs(g) do
+        if live[tostring(id)] then
+          keep[id] = v
+        end
+      end
+      wezterm.GLOBAL[key] = keep
+    end
+  end
 end
 
 return M
