@@ -15,6 +15,8 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - D-M1-007 zsh 禁用 path 变量名（保留变量陷阱）
 - D-M1-008 walking-cat splash 动画（原版契约蒸馏）
 - D-M1-009 键位主键 Cmd+F 系（Cmd+Shift+字母规范化陷阱）
+- D-M1-010 Explorer 常驻左栏（原版 open_sidebar 契约）
+- D-M1-011 Explorer 三点对齐（点击打开/超长名/自刷新）
 
 ## 记录
 
@@ -95,3 +97,17 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - 补全：Explorer 重做为自绘静态屏（explorer.sh，四区 + 数字导航 + g/gd/b/w/p/f/r/a/q，对齐原版 Show-Listing）；Init 面板补 a 全量视图、d dash(grok)。
 - 防线：explorer 视觉回归并入 check.sh；wzlib.zsh 公共库消除双份拷贝；注册表加载按 id 去重。
 - 验证：当前 GUI 会话日志零错误；Init a 键、Explorer 数字导航/收藏/D-012、d 键 dash 全部 cli 层实测通过。
+
+### D-M1-010 Explorer 常驻左栏（2026-08-15）
+
+- 用户两次批评 Explorer 做成"单独开个界面"。对齐原版 `open_sidebar` 契约：当前页签内 `split Left`（size 0.21），根 = tab 任务 desk（绑定主视图），初始 VIEW = 焦点 pane cwd（在 desk 树内时），singleton（已存在 → 聚焦 + `r` 就地刷新，绝不重复 split），host = 面积最大非 explorer pane。
+- 实现：sidebar.lua 重写（GLOBAL macos_sidebar_tabs[tab_id]=pane_id + 存活校验 + argv fallback）；explorer.sh 第二参数 VIEW0。窄栏渲染三修复：WZ_MIN_COLS 按面板覆盖（refresh_size 原 54 钳制会把 45 列侧栏钳破帧）、box_top 标题截断、key_row squeeze 分支循环内 local 泄漏 stdout（seg_w=N）。
+- 回归：explorer 矩阵 45/80 双宽度 + seg_w 泄漏断言。GUI 实测：Cmd+F7 侧栏与 grok 主视图并存、singleton、q 退出重开正常。
+
+### D-M1-011 Explorer 三点对齐（2026-08-15）
+
+- 原版 sidebar.ps1 审查结论：点击打开（数字进入 + `o N` 系统默认打开 + OSC8 超链接）、超长名（Format-NameFit 扩展名保护 head~tail.ext）、自刷新（FileSystemWatcher 事件驱动）三点均存在且牢固。macOS 按此三点移植并加固。
+- **点击打开**：`o<num>` = 系统默认打开（目录→Finder，文件→默认应用），存在性检查 + 失败 hint；条目行 OSC8 file:// 超链接（Cmd+Click 打开）。加固：可执行文件/`.app/.command` 等危险项不生成超链接（is_linkable 门禁，防误点执行，对应原版 LauncherExt 哲学）；OPEN_CMD 环境变量可中和（回归用 /bin/echo）。
+- **超长名**：wzlib 新增 ztrunc_display/tail_display/format_name_fit（head~tail.ext 扩展名保护，dwidth 感知 CJK=2，head 55% 预算）。陷阱：zsh `${x%~}` 永不匹配字面 ~，用 `%?` 条件删除。
+- **自刷新**：原版 FSW 事件驱动；zsh 无内核监视，用快照比对（ls -lTA | md5，0.4s 轮询）实现"变化才重绘"等价体验——不闪屏、感知变化、0.4s 内响应。a 键开关、r 手动、目录切换自动重拍基线。陷阱：`ls -lT` 不含 -A 会漏隐藏文件（与列表 ls -1A 口径不一），必须 -lTA；OSC8 ST 终止符 `\` 被 zsh print 默认吞掉（print -r 陷阱的又一形态），osc8 输出必须 print -rn。
+- 回归：explorer 36 项（45/80 矩阵 + OSC8 存在 + 可执行不链接 + head~tail.ext + o<num> 双分支 + fs 检测单测）。GUI 实测：o1 真实唤起 Finder、auto 下 touch/rm 隐藏文件自动出现/消失、侧栏 45 列渲染完整。

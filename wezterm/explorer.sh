@@ -20,6 +20,7 @@ ROOTS_FILE="${WZ_ROOTS_FILE:-$WZ_DIR/workbench/desk-roots.tsv}"
 AGENT_FILE="${WZ_AGENTS_FILE:-$WZ_DIR/workbench/agents.tsv}"
 FAV_FILE="${WZ_FAV_FILE:-$WZ_DIR/workbench/favorites.tsv}"
 WEZ="${WEZ:-$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")}"
+OPEN_CMD="${OPEN_CMD:-open}"   # regression harness can neutralize with /bin/echo
 
 source "${WZ_LIB:-$WZ_DIR/wzlib.zsh}"
 WZ_MIN_COLS=28   # sidebar rail renders down to 28 cols (0.21 rail of 133-col window)
@@ -165,6 +166,21 @@ copy_path() {
   print -n "$VIEW" | pbcopy 2>/dev/null && hint="path copied" || hint="copy failed"
 }
 
+open_default() {  # open_default <path> [kind] — dir → Finder, file → default app
+  local p="$1" kind="${2:-file}"
+  [[ -e "$p" || -L "$p" ]] || { hint="path missing"; return 1; }
+  if "$OPEN_CMD" "$p" >/dev/null 2>&1; then
+    if [[ "$kind" == "dir" ]]; then
+      hint="Finder: $p"
+    else
+      hint="opened ${p:t}"
+    fi
+  else
+    hint="open failed: ${p:t}"
+    return 1
+  fi
+}
+
 launch_at() {  # launch_at <path> — default agent (bound column-3 first)
   local root="$1"
   root="${root%/}"
@@ -190,6 +206,25 @@ launch_at() {  # launch_at <path> — default agent (bound column-3 first)
 # =============================================================================
 # render
 # =============================================================================
+
+# render_entry_row <idx> <name> <path> <isdir> <color>
+# Fixed-width clickable row: name fit via head~tail.ext (upstream Write-FileRow)
+render_entry_row() {
+  local idx="$1" name="$2" path="$3" isdir="$4" colr="$5"
+  local display w padc maxname idx3
+  maxname=$(( INNER - 8 ))
+  (( maxname < 6 )) && maxname=6
+  display=$(format_name_fit "$name" $maxname "$isdir")
+  w=$(dwidth "$display")
+  idx3=${(l:3:: :)idx}
+  padc=$(( INNER - 6 - w ))
+  (( padc < 0 )) && padc=0
+  print -rn "${colr}  |${X} ${D}${idx3}${X}  "
+  osc8_link "$path" "$display" "$isdir"
+  print -rn "${D}$(pad '' $padc)${X}"
+  print -r "${colr}|${X}"
+}
+
 render() {
   print -n $'\e[2J\e[H'
   refresh_size
@@ -240,14 +275,14 @@ render() {
   # dirs (cyan + trailing slash, upstream style)
   i=1
   while (( i <= ${#DIRS} )); do
-    key_row "$C" "Y:[$idx]" "C:   ${DIRS[$i]}/"
+    render_entry_row $idx "${DIRS[$i]}" "$VIEW/${DIRS[$i]}" 1 "$C"
     idx=$(( idx + 1 ))
     i=$(( i + 1 ))
   done
   # files
   i=1
   while (( i <= ${#FILES} )); do
-    key_row "$C" "Y:[$idx]" "G:   ${FILES[$i]}"
+    render_entry_row $idx "${FILES[$i]}" "$VIEW/${FILES[$i]}" 0 "$C"
     idx=$(( idx + 1 ))
     i=$(( i + 1 ))
   done
@@ -259,12 +294,12 @@ render() {
 
   # ----- 3 COMMAND (dark gray) -----
   box_top "3 COMMAND  << type keys here" "$D"
-  key_row "$D" "Y: >_" "W:  explorer> number = enter/open · q = quit"
+  key_row "$D" "Y: >_" "W:  number = enter · o<num> = Finder/open · Cmd+Click 链接"
   box_rule "$D"
   key_row "$D" "Y:[0/..]" "G: parent  " "Y:[s]" "G: back to DESK  " "Y:[r]" "G: refresh  " "Y:[a]" "D: auto"
   key_row "$D" "Y:[g]" "W: AI@VIEW  " "Y:[gd]" "W: AI@DESK  " "Y:[b]" "G: bind VIEW  " "Y:[w]" "G: shell"
   box_rule "$D"
-  key_row "$D" "Y:[p]" "D: copy path  " "Y:[f]" "D: favorite  " "Y:[q]" "D: quit"
+  key_row "$D" "Y:[o<num>]" "D: system open  " "Y:[p]" "D: copy path  " "Y:[f]" "D: favorite  " "Y:[q]" "D: quit"
   box_bottom "$D"
 }
 
@@ -308,31 +343,43 @@ dispatch() {
       fi
       return ;;
   esac
-  if [[ "$line" =~ ^[0-9]+$ ]]; then
-    local n=$line total
+  if [[ "$line" =~ ^[0-9]+$ || "$line" =~ ^o[0-9]+$ ]]; then
+    local force_open=0 n
+    if [[ "$line" == o* ]]; then
+      force_open=1
+      n=${line#o}
+    else
+      n=$line
+    fi
+    local total t ek ep
     total=$(( ${#FAV_NAME} + ${#DIRS} + ${#FILES} ))
     if (( n < 1 || n > total )); then
       hint="no entry #$n (1-$total)"
       return
     fi
-    local t=$n
+    t=$n
     if (( t <= ${#FAV_NAME} )); then
-      VIEW="${FAV_PATH[$t]}"
-      list_view
-      return
+      ek="dir"; ep="${FAV_PATH[$t]}"
+    else
+      t=$(( t - ${#FAV_NAME} ))
+      if (( t <= ${#DIRS} )); then
+        ek="dir"; ep="$VIEW/${DIRS[$t]}"
+      else
+        t=$(( t - ${#DIRS} ))
+        ek="file"; ep="$VIEW/${FILES[$t]}"
+      fi
     fi
-    t=$(( t - ${#FAV_NAME} ))
-    if (( t <= ${#DIRS} )); then
-      VIEW="$VIEW/${DIRS[$t]}"
+    if (( force_open == 1 )); then
+      open_default "$ep" "$ek"    # folders → Finder, files → default app
+    elif [[ "$ek" == "dir" ]]; then
+      VIEW="$ep"
       list_view
-      return
+    else
+      open_default "$ep" "file"
     fi
-    t=$(( t - ${#DIRS} ))
-    open "$VIEW/${FILES[$t]}" 2>/dev/null
-    hint="opened ${FILES[$t]}"
     return
   fi
-  hint="unknown — number · 0/.. · s · g · gd · b · w · p · f · r · a · q"
+  hint="unknown — number · o<num> · 0/.. · s · g · gd · b · w · p · f · r · a · q"
 }
 
 # =============================================================================
@@ -355,7 +402,18 @@ while true; do
   render
   print -n "${Y}  explorer> ${X}"
   if (( auto == 1 )); then
-    read -r -t 5 line || { list_view; continue; }
+    fs_snap_reset "$VIEW"
+    line=""
+    while true; do
+      if read -r -t 0.4 line; then
+        break
+      fi
+      if fs_changed "$VIEW"; then
+        list_view
+        load_favs
+        break
+      fi
+    done
   else
     read -r line || { print ""; exit 0 }
   fi

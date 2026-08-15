@@ -102,6 +102,143 @@ pad_tail() {  # pad_tail <text> <width> — head-truncate with leading '~'
 }
 
 # =============================================================================
+# Explorer alignment primitives (upstream sidebar.ps1 distilled, 2026-08-15)
+#   - click-to-open hyperlinks with safety gate (executables never linked)
+#   - head~tail.ext truncation (extension kept, CJK-aware)
+#   - filesystem change detection (poll-and-compare; no kernel watcher in zsh)
+# =============================================================================
+
+# is_linkable <path> [kind] — 0 = safe for click-to-open hyperlink
+is_linkable() {
+  local p="$1" kind="${2:-}"
+  [[ -d "$p" ]] && return 0
+  [[ "$kind" == "dir" ]] && return 0
+  local ext
+  ext="${p:e:l}"   # zsh :e = extension, :l = lowercase
+  case "$ext" in
+    app|command|workflow|scpt|jar|msi|exe|bat|cmd|com|scr|reg|vbs|vbe|lnk) return 1 ;;
+  esac
+  [[ -x "$p" ]] && return 1
+  return 0
+}
+
+# file_uri <path> — minimal RFC-compliant file URI
+file_uri() {
+  local p="$1"
+  p="${p//\%/%25}"
+  p="${p// /%20}"
+  p="${p//\#/%23}"
+  p="${p//\?/%3F}"
+  print -rn "file://$p"
+}
+
+# osc8_link <path> <label> [kind] — click-to-open row; non-linkable = plain text
+osc8_link() {
+  local p="$1" label="$2" kind="${3:-}"
+  if ! is_linkable "$p" "$kind"; then
+    print -rn "$label"
+    return
+  fi
+  print -rn $'\e]8;;'"$(file_uri "$p")"$'\e\\'"$label"$'\e]8;;'$'\e\\'
+}
+
+# ztrunc_display <text> <maxcells> — display-width truncate + '~'
+ztrunc_display() {
+  local t="$1" w="$2"
+  [[ -z "$t" ]] && { print -n ""; return; }
+  (( w <= 0 )) && { print -n ""; return; }
+  (( $(dwidth "$t") <= w )) && { print -n "$t"; return; }
+  (( w <= 1 )) && { print -n "~"; return; }
+  local acc="" c
+  for c in ${(s::)t}; do
+    if (( $(dwidth "$acc$c") > w - 1 )); then
+      print -n "${acc}~"
+      return
+    fi
+    acc="$acc$c"
+  done
+  print -n "${acc}~"
+}
+
+# tail_display <text> <maxcells> — take the last <maxcells> display cells
+tail_display() {
+  local t="$1" w="$2" rev="" i c
+  local len=${#t}
+  for (( i = len; i >= 1; i-- )); do
+    c="${t[i,i]}"
+    if (( $(dwidth "$c$rev") > w )); then break; fi
+    rev="$c$rev"
+  done
+  print -n "$rev"
+}
+
+# format_name_fit <name> <maxcells> <isdir> — head~tail.ext, extension kept
+format_name_fit() {
+  local name="$1" w="$2" isdir="${3:-0}"
+  local suffix=""
+  (( isdir == 1 )) && suffix="/"
+  local sw; sw=$(dwidth "$suffix")
+  local core="$name" budget
+  budget=$(( w - sw ))
+  (( budget < 2 )) && budget=2
+  if (( $(dwidth "$core") <= budget )); then
+    print -n "${core}${suffix}"
+    return
+  fi
+  local ext="" base="$core"
+  if (( isdir == 0 )); then
+    local stem="${core%.*}"
+    if [[ -n "$stem" && "$core" == *.* ]]; then
+      ext=".${core:e}"
+      base="$stem"
+    fi
+  fi
+  local extw; extw=$(dwidth "$ext")
+  local room=$(( budget - extw - 1 ))   # 1 cell for '~'
+  if (( room < 2 )); then
+    print -n "$(ztrunc_display "$core" $budget)${suffix}"
+    return
+  fi
+  local headn tailn
+  headn=$(( room * 55 / 100 ))
+  (( headn < 4 )) && headn=4
+  tailn=$(( room - headn ))
+  if (( tailn < 2 )); then
+    tailn=2
+    headn=$(( room - tailn ))
+  fi
+  local head tail
+  head=$(ztrunc_display "$base" $headn)
+  [[ "$head" == *\~ ]] && head="${head%?}"   # zsh: ${x%~} never matches literal ~
+  if (( tailn > 0 )) && [[ -n "$base" ]]; then
+    tail=$(tail_display "$base" $tailn)
+  fi
+  print -n "${head}~${tail}${ext}${suffix}"
+}
+
+# ---- filesystem change detection (event-style redraw; no kernel watcher) ----
+typeset FS_SNAP_PREV=""
+fs_snapshot() {  # <dir> -> fingerprint (ls -lTA | md5; raw fallback)
+  local d="$1" out
+  out=$(ls -lTA "$d" 2>/dev/null)
+  if command -v md5 >/dev/null 2>&1; then
+    print -n "$out" | md5 -q 2>/dev/null
+  else
+    print -n "$out"
+  fi
+}
+fs_snap_reset() { FS_SNAP_PREV="$(fs_snapshot "$1")"; }
+fs_changed() {  # <dir> -> 0 if changed since last reset
+  local s
+  s=$(fs_snapshot "$1")
+  if [[ "$s" != "$FS_SNAP_PREV" ]]; then
+    FS_SNAP_PREV="$s"
+    return 0
+  fi
+  return 1
+}
+
+# =============================================================================
 # box primitives — every line exactly TOT cells wide
 # =============================================================================
 box_top() {  # box_top <title> <color>
