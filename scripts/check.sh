@@ -70,6 +70,52 @@ else
   FAIL=1
 fi
 
+say "== effective keymap =="
+if [ -n "$WEZ" ]; then
+  KEYS_OUT="$("$WEZ" --config-file "$DIR/wezterm/wezterm.lua" show-keys --lua 2>/dev/null)"
+  if [ -z "$KEYS_OUT" ]; then
+    bad "show-keys returned empty"
+    FAIL=1
+  else
+    km_has() {  # km_has <desc> <literal>
+      if printf '%s\n' "$KEYS_OUT" | grep -qF "$2"; then
+        ok "$1"
+      else
+        bad "$1 (missing: $2)"
+        FAIL=1
+      fi
+    }
+    km_lacks() {  # km_lacks <desc> <literal> — literal must NOT appear
+      if printf '%s\n' "$KEYS_OUT" | grep -qF "$2"; then
+        bad "$1 (should be absent: $2)"
+        FAIL=1
+      else
+        ok "$1"
+      fi
+    }
+    km_has "Cmd+T Init binding" "{ key = 't', mods = 'SUPER'"
+    km_has "Cmd+F1 help binding" "{ key = 'F1', mods = 'SUPER'"
+    km_has "Cmd+F3 init binding" "{ key = 'F3', mods = 'SUPER'"
+    km_has "Cmd+F4 close-pane binding" "{ key = 'F4', mods = 'SUPER'"
+    km_has "Cmd+F6 desk binding" "{ key = 'F6', mods = 'SUPER'"
+    km_has "Cmd+F7 explorer binding" "{ key = 'F7', mods = 'SUPER'"
+    km_has "Fn+F1 alias" "{ key = 'F1', mods = 'NONE'"
+    km_has "Fn+F3 alias" "{ key = 'F3', mods = 'NONE'"
+    km_has "Fn+F4 alias" "{ key = 'F4', mods = 'NONE'"
+    km_has "Fn+F5 reload alias" "{ key = 'F5', mods = 'NONE'"
+    km_has "Fn+F6 alias" "{ key = 'F6', mods = 'NONE'"
+    km_has "Fn+F7 alias" "{ key = 'F7', mods = 'NONE'"
+    km_has "Cmd+W default close-tab intact" "{ key = 'w', mods = 'SUPER', action = act.CloseCurrentTab"
+    km_lacks "Cmd+W pane-close hijack removed" "{ key = 'W', mods = 'SUPER', action = act.CloseCurrentPane"
+    km_lacks "Cmd+H not hijacked (no workbench action)" "{ key = 'H', mods = 'SUPER', action = act.EmitEvent"
+    km_lacks "Cmd+D not hijacked" "{ key = 'D', mods = 'SUPER', action = act.EmitEvent"
+    km_lacks "Cmd+E not hijacked" "{ key = 'E', mods = 'SUPER', action = act.EmitEvent"
+  fi
+else
+  bad "wezterm binary not found — skipping keymap check"
+  FAIL=1
+fi
+
 say "== mirror md5 (repo vs ~/.config/wezterm) =="
 if [ -f "$HOME/.config/wezterm/wezterm.lua" ]; then
   MIRROR_FAIL=0

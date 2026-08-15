@@ -2,22 +2,25 @@
   ★ AI STAR CUBE · macOS · 快捷键速查
 ═══════════════════════════════════════════════════════════
 
-【核心 · Cmd 系】
-  Cmd+T           新 Init 面板页签（冷启动自动进入面板）
-  Cmd+Shift+D     三栏 AI 桌（agent + shell + 监视）
-  Cmd+Shift+E     Explorer 面板页签（当前任务根）
-  Cmd+Shift+H     本速查面板（开关）
-  Cmd+Shift+W     关闭窗格
-  Cmd+R           重载配置
+【核心 · Cmd 系主键（推荐）】
+  Cmd+T            新 Init 面板页签（冷启动自动进入面板）
+  Cmd+F1           本速查面板（开关）
+  Cmd+F3           Init 面板
+  Cmd+F4           关闭当前窗格（有确认）
+  Cmd+F6           三栏 AI 桌（agent + shell + 监视）
+  Cmd+F7           Explorer 侧栏（当前任务根）
+  Cmd+R            重载配置（WezTerm 默认）
 
-【别名 · Fn+F 键】
-  Fn+F3 Init 面板  Fn+F6 三栏 AI 桌
-  Fn+F7 Explorer   Fn+F1 速查
-  Fn+F4 关窗格     Fn+F5 重载
+【F 键直按 · 与 Windows 同键位】
+  F1 速查  F3 Init  F4 关窗格  F5 重载  F6 三栏  F7 Explorer
+  （媒体键模式下按住 Fn：Fn+F1/F3/F4/F5/F6/F7；系统设置开启
+  "标准功能键"后可直接裸按。F2 留空给 agent 自身）
 
 【键位原则】
   工作台键全部窗口内消化，不抢 agent 字母键；
-  无 Leader 层；未绑定按键原样进入终端。
+  无 Leader 层；Cmd+W/H/D/E 保持 macOS 系统默认行为。
+  为什么不用 Cmd+Shift+字母：WezTerm 会把它规范成裸
+  Cmd+字母，抢走 Cmd+W 关标签、Cmd+H 隐藏应用等系统键。
 
 【Init 面板（静态屏 · 行输入）】
   wz> 数字            选任务 → agent> 再选模型

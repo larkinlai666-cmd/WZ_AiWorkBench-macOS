@@ -31,12 +31,16 @@ function M.open(window, pane)
     return
   end
   local tab, main
-  pcall(function()
+  local ok, err = pcall(function()
     tab, main = window:mux_window():spawn_tab({
       args = { "/bin/zsh", "-l", "-c", "exec zsh " .. explorer_script .. " " .. sh_quote(root) },
       cwd = root,
     })
   end)
+  if not ok or not main then
+    toast(window, "Explorer", "页签创建失败: " .. tostring(err or "nil"), 4500)
+    return
+  end
   if tab then
     pcall(function()
       tab:set_title("Explorer")

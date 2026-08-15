@@ -1,9 +1,12 @@
 -- =============================================================================
---  AI STAR CUBE · macOS · key contract (D-M1-003)
---  Cmd+Shift primary; Fn+F aliases; no Leader (D-007); zero Ctrl bindings.
---  Workbench keys are fully digested by WezTerm — never reach agent TUIs.
---  Key names use lowercase letters + explicit SHIFT|SUPER mods (canonical form).
---  M4 wiring: all actions bound to real implementations.
+--  AI STAR CUBE · macOS · key contract (D-M1-009)
+--  REGRESSION LESSON (2026-08-15): WezTerm canonicalizes SHIFT|SUPER + letter
+--  to UPPERCASE + SUPER — so Cmd+Shift+W/H/D/E were actually bound as plain
+--  Cmd+W/H/D/E, hijacking macOS defaults (Cmd+W close-tab, Cmd+H hide-app).
+--  New primary set uses Cmd+F-keys (no canonicalization issue; verified to
+--  reach WezTerm with SUPER modifier on this machine) + Fn+F aliases.
+--  Cmd+W / Cmd+H / Cmd+D / Cmd+E stay 100% default macOS behavior.
+--  No Leader (D-007); zero Ctrl bindings (D-M1-003).
 -- =============================================================================
 
 local wezterm = require("wezterm")
@@ -28,13 +31,16 @@ function M.apply(config)
     -- Primary: Cmd family (window-local, agent-transparent)
     ------------------------------------------------------------------
     { key = "t", mods = "SUPER", action = cb(function(w, p) init.open_init_tab(w, p) end) },
-    { key = "d", mods = "SHIFT|SUPER", action = cb(function(w, p) layouts.open_workbench(w, p) end) },
-    { key = "e", mods = "SHIFT|SUPER", action = cb(function(w, p) sidebar.show(w, p) end) },
-    { key = "h", mods = "SHIFT|SUPER", action = cb(function(w, p) help.toggle(w, p) end) },
-    { key = "w", mods = "SHIFT|SUPER", action = act.CloseCurrentPane({ confirm = true }) },
+    { key = "F1", mods = "SUPER", action = cb(function(w, p) help.toggle(w, p) end) },
+    { key = "F3", mods = "SUPER", action = cb(function(w, p) init.open_init_tab(w, p) end) },
+    { key = "F4", mods = "SUPER", action = act.CloseCurrentPane({ confirm = true }) },
+    { key = "F6", mods = "SUPER", action = cb(function(w, p) layouts.open_workbench(w, p) end) },
+    { key = "F7", mods = "SUPER", action = cb(function(w, p) sidebar.show(w, p) end) },
 
     ------------------------------------------------------------------
-    -- Aliases: Fn+F keys (macOS media-key layer; not a stability dependency)
+    -- Aliases: Fn+F keys (macOS media-key layer)
+    --   media mode (default): Fn+F1..F7 deliver these same keycodes
+    --   standard mode: bare F1..F7 deliver them directly
     ------------------------------------------------------------------
     { key = "F3", mods = "NONE", action = cb(function(w, p) init.open_init_tab(w, p) end) },
     { key = "F4", mods = "NONE", action = act.CloseCurrentPane({ confirm = true }) },
@@ -48,7 +54,7 @@ function M.apply(config)
     pcall(function()
       window:toast_notification(
         "AI STAR CUBE",
-        "配置已重载 · Cmd+T Init 面板 · Cmd+Shift+D 三栏 · Cmd+Shift+E 侧栏 · Cmd+Shift+H 速查",
+        "配置已重载 · Cmd+T Init · Cmd+F1 速查 · Cmd+F3 Init · Cmd+F4 关窗格 · Cmd+F6 三栏 · Cmd+F7 Explorer",
         nil,
         5000
       )

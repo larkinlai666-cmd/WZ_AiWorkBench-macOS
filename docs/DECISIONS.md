@@ -14,6 +14,7 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - D-M1-006 Init 静态屏用 zsh（修正 D-M1-002 面板部分）
 - D-M1-007 zsh 禁用 path 变量名（保留变量陷阱）
 - D-M1-008 walking-cat splash 动画（原版契约蒸馏）
+- D-M1-009 键位主键 Cmd+F 系（Cmd+Shift+字母规范化陷阱）
 
 ## 记录
 
@@ -79,6 +80,14 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - zsh 陷阱（本决策附带）：`print` 默认吞转义（`\_`→`_` 猫头反斜杠丢失）必须 `print -r`；含反斜杠的 ASCII art 行用 `print -r "... /\_/\\${X}"`（`\\` 才产出字面反斜杠，`\${X}` 不会展开变量）。
 - 来源：用户 2026-08-15 指出"猫猫 loading 动画不会正常播放"。
 - 影响：splash.sh + splash_visual_check.py（11 项断言，已入 check.sh 防线）。
+
+### D-M1-009 [active]
+
+- **键位主键改为 Cmd+F 系**（Cmd+T / Cmd+F1 速查 / Cmd+F3 Init / Cmd+F4 关窗格 / Cmd+F6 三栏 / Cmd+F7 Explorer / Cmd+R 重载），F 键裸按（Fn+F1...）作别名；F2 留空。
+- 根因：V1 的 Cmd+Shift+D/E/H/W 被 WezTerm 规范化为裸 Cmd+D/E/H/W（`show-keys --lua` 实测 `SHIFT|SUPER+字母 → 大写字母+SUPER`），抢走 Cmd+W 关标签、Cmd+H 隐藏应用等系统默认键，且裸按 Cmd+D/E 即误触发工作台动作。用户实测反馈"很多快捷键完全失效/混乱"正是此因。
+- 依据：GUI 键事件日志（debug_key_events）实测 `Cmd+F3` 以 `SUPER+Function(3)` 送达 WezTerm；`Ctrl+F3` 被 macOS 系统层吞掉（Ctrl 系不可用）；合成 F3/F7/F1 键码均送达并正确触发（等价于媒体键模式下 Fn+F 的交付形态）。
+- 另一实测根因：`help.toggle` 曾全窗口扫描速查 pane 后 `window:perform_action(action, other_pane)` 关闭——本 WezTerm 版本不按 pane 参数定向，作用于焦点 pane，导致 F1 误杀其他页签的会话。修复为当前页签作用域 + 先 activate 再关闭（2026-08-15，与 773b5e7 之后的键位修复同批）。
+- 影响：keys.lua / help.lua / sidebar.lua（错误可见化）/ cheatsheet / KEYBINDINGS.md；check.sh 新增 effective-keymap 断言（show-keys 生效表必须含 F 键系 + Cmd+F 系，且 Cmd+W/H 保持默认）。
 
 ### 对抗性审查结论（2026-08-15）
 
