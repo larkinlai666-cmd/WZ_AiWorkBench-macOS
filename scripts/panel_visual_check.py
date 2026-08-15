@@ -172,6 +172,46 @@ def grid_checks(cols: int, text: str):
         check(p_tag == 25, f"[{cols}] Tag starts at fixed column 25 (got {p_tag})")
 
 
+def wizard_render() -> tuple:
+    """Drive the 4-step wizard end-to-end and return output + side effects."""
+    with tempfile.TemporaryDirectory() as td:
+        proj = os.path.join(td, "Alpha")
+        os.makedirs(proj)
+        roots = os.path.join(td, "roots.tsv")
+        with open(roots, "w") as f:
+            f.write(f"Alpha\t{proj}\tcodex\n")
+        agentsf = os.path.join(td, "agents.tsv")
+        with open(agentsf, "w") as f:
+            f.write(
+                "codex\tOpenAI Codex CLI\tcodex\tflag\t-C\t0\n"
+                "kimi\tKimi Code CLI\tkimi\tcwd\t\t0\n"
+            )
+        env = dict(os.environ)
+        env["WZ_LIB"] = WZLIB
+        env["WZ_ROOTS_FILE"] = roots
+        env["WZ_AGENTS_FILE"] = agentsf
+        env["WZ_COLS"] = "80"
+        env["WEZ"] = "/bin/echo"   # neutralize spawn side effects in the harness
+        # c -> wizard; WZTest -> name; 2 -> location RECENT(td); Enter -> default
+        # agent; y -> confirm & create & launch
+        feed = "c\nWZTest\n2\n\ny\n"
+        p = subprocess.run(
+            ["zsh", INIT], input=feed, capture_output=True, text=True, env=env
+        )
+        if p.returncode != 0:
+            print("  FAIL  wizard run exited non-zero: " + str(p.returncode))
+            print(p.stderr[:800])
+            sys.exit(1)
+        with open(roots) as f:
+            roots_content = f.read()
+        wzproj = ""
+        wp = os.path.join(td, "WZTest", ".wz-project")
+        if os.path.exists(wp):
+            with open(wp) as f:
+                wzproj = f.read()
+        return ANSI.sub("", p.stdout), roots_content, wzproj, td
+
+
 def main():
     text80 = render(80)
 
@@ -185,6 +225,26 @@ def main():
     interior60 = [l for l in text60.split("\n") if l.startswith("  |")]
     check(all(l.rstrip().endswith("|") and disp(l.rstrip()) == tot60 for l in interior60),
           "[60] ultra-narrow keeps frames flush (no wrap)")
+
+    # ---- COMMAND zone regular grid (chip slot 11 + label slot 24) ----
+    l1 = next((l for l in text80.split("\n") if "one-shot launch" in l), None)
+    l2 = next((l for l in text80.split("\n") if "NEW TASK wizard" in l), None)
+    l3 = next((l for l in text80.split("\n") if "all view" in l), None)
+    if l1 and l2 and l3:
+        c1 = pos_of(l1, "[ <t><a> ]")
+        c2 = pos_of(l2, "[ c ]")
+        c3 = pos_of(l3, "[ a ]")
+        check(c1 == 43 and c2 == 43 and c3 == 43,
+              f"COMMAND chip column 2 flush at 43 (got {c1}/{c2}/{c3})")
+        k1 = pos_of(l1, "[ <num> ]")
+        k2 = pos_of(l2, "[ n<num> ]")
+        k3 = pos_of(l3, "[ s ]")
+        check(k1 == 4 and k2 == 4 and k3 == 4,
+              f"COMMAND chip column 1 flush at 4 (got {k1}/{k2}/{k3})")
+        v1 = pos_of(l1, " one-shot launch")
+        v2 = pos_of(l2, " NEW TASK wizard")
+        check(v1 == 56 and v2 == 56,
+              f"COMMAND label column 2 flush at 56 (got {v1}/{v2})")
 
     # ---- 80-col full-content assertions ----
     lines = text80.split("\n")
@@ -205,6 +265,19 @@ def main():
     check("! launch cancelled" in text80, "cancel hint repaint after q")
     check("ALL non-noise (combo off)" in text80, "a toggles all-view (combo off)")
     check("wz>" in text80, "step1 wz> prompt present")
+
+    # ---- wizard 4-step flow ----
+    wtext, wroots, wproj, wtd = wizard_render()
+    check("Step 1/4 · project name" in wtext, "wizard step1 name renders")
+    check("Step 2/4 · create location" in wtext, "wizard step2 location renders")
+    check("LOCATIONS" in wtext and "RECOMMENDED" in wtext, "wizard location candidates render")
+    check("Step 3/4 · default agent" in wtext, "wizard step3 agent renders")
+    check("Step 4/4 · confirm" in wtext, "wizard step4 confirm renders")
+    check(f"WZTest\t{os.path.join(wtd, 'WZTest')}\tcodex" in wroots,
+          "wizard freezes desk-roots row (name/path/agent)")
+    check(f"name=WZTest\npath={os.path.join(wtd, 'WZTest')}\n" == wproj,
+          "wizard freezes .wz-project identity")
+    check("wizard cancelled" not in wtext, "wizard completes without cancellation")
 
     print("")
     if failures:

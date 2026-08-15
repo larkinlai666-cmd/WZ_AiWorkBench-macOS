@@ -23,7 +23,7 @@
   wz> 数字            选任务 → agent> 再选模型
   wz> <任务><agent>   两位数一次直启（≤9 任务时）
   wz> n<数字>         强制新会话 → 选模型
-  wz> c               新建任务向导（名 → 父目录 → 冻结）
+  wz> c               新建任务向导（名 → 位置 → agent → 确认）
   wz> s               纯 shell 页签
   wz> a               全量视图切换
   wz> d               grok Dashboard

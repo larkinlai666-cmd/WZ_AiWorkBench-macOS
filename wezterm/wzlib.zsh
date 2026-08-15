@@ -234,7 +234,7 @@ resolve_agent_exe() {  # <name or /abs/path> -> runnable path or empty
 
 load_agents() {
   A_ID=(); A_LABEL=(); A_EXE=(); A_MODE=(); A_FLAG=(); A_CLEAR=()
-  typeset -A _seen
+  typeset -A _seen _seen_exe
   local id label exe mode flag clear exep
   if [[ -f "$AGENT_FILE" ]]; then
     while IFS=$'\t' read -r id label exe mode flag clear; do
@@ -243,6 +243,8 @@ load_agents() {
       _seen[$id]=1
       exep=$(resolve_agent_exe "$exe")
       [[ -z "$exep" ]] && continue   # missing exe -> hidden (equal footing)
+      (( ${+_seen_exe[$exep]} )) && continue   # same binary registered twice -> first row wins
+      _seen_exe[$exep]=1
       A_ID+=("$id")
       A_LABEL+=("${label:-$id}")
       A_EXE+=("$exep")

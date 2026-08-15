@@ -126,9 +126,11 @@ function M.installed()
   end
   local rows = M.read_registry()
   local out = {}
+  local seen_exe = {}
   for _, r in ipairs(rows) do
     local p = M.resolve_exe(r.exe)
-    if p then
+    if p and not seen_exe[p] then
+      seen_exe[p] = true
       local e = {}
       for k, v in pairs(r) do
         e[k] = v

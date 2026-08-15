@@ -18,7 +18,7 @@ WZ_DIR="$HOME/.config/wezterm"
 ROOTS_FILE="${WZ_ROOTS_FILE:-$WZ_DIR/workbench/desk-roots.tsv}"
 AGENT_FILE="${WZ_AGENTS_FILE:-$WZ_DIR/workbench/agents.tsv}"
 FAV_FILE="${WZ_FAV_FILE:-$WZ_DIR/workbench/favorites.tsv}"
-WEZ="$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")"
+WEZ="${WEZ:-$(command -v wezterm 2>/dev/null || echo "$HOME/.local/bin/wezterm")}"
 
 source "${WZ_LIB:-$WZ_DIR/wzlib.zsh}"
 
