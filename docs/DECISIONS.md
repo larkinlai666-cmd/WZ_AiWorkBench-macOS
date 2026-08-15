@@ -13,6 +13,7 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - D-M1-005 蒸馏契约、独立实现
 - D-M1-006 Init 静态屏用 zsh（修正 D-M1-002 面板部分）
 - D-M1-007 zsh 禁用 path 变量名（保留变量陷阱）
+- D-M1-008 walking-cat splash 动画（原版契约蒸馏）
 
 ## 记录
 
@@ -70,6 +71,14 @@ ID 规则：F = 用户提供的事实；D = 用户批准的决策。全部 activ
 - **zsh 脚本禁用 `path` 作为变量名**（zsh 保留变量，与 PATH 标量双向同步；`local path=...` 或 `read -r ... path ...` 会直接覆盖 PATH，导致后续外部命令全部找不到）。统一改用 `ppath`。同族陷阱：顶层（函数外）禁止 `local`（read 行为异常回显赋值）；`print -r` 不解释 `\t`（文件数据写入用 `printf '%s\t%s\n'`）。
 - 来源：2026-08-15 对抗性审查，explorer.sh 收藏写入触发 mktemp not found（PATH 被 local path 覆盖）。
 - 影响：init.sh / explorer.sh / wzlib.zsh 全部变量命名规范；审查清单必查项。
+
+### D-M1-008 [active]
+
+- **agent 启动前播放 walking-cat splash 动画**（原版 Get-AgentSplashScript 契约蒸馏）：5 帧 × 75ms ≈ 300ms 固定窗口，猫猫随读条右移、脸/腿两姿态交替、读条 0%→100%、Magenta 装饰色（D-013 不用黄色）、重定向降级单帧、agent 首屏自动覆盖；无就绪轮询、无启动依赖。
+- 实现：独立 wezterm/splash.sh，两条启动路径统一接入（wzlib.launch_agent 与 agents.lua splash_args）；静态 splash.txt 已删除；环境变量 WZ_SPLASH_FRAMES / WZ_SPLASH_MS 可慢放调试。
+- zsh 陷阱（本决策附带）：`print` 默认吞转义（`\_`→`_` 猫头反斜杠丢失）必须 `print -r`；含反斜杠的 ASCII art 行用 `print -r "... /\_/\\${X}"`（`\\` 才产出字面反斜杠，`\${X}` 不会展开变量）。
+- 来源：用户 2026-08-15 指出"猫猫 loading 动画不会正常播放"。
+- 影响：splash.sh + splash_visual_check.py（11 项断言，已入 check.sh 防线）。
 
 ### 对抗性审查结论（2026-08-15）
 
