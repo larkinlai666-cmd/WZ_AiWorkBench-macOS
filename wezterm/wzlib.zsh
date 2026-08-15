@@ -20,15 +20,29 @@ typeset E=$'\e[32;1m'    # green — success / (default) tag
 typeset X=$'\e[0m'
 
 # ---- terminal size ----
+# refresh_size re-reads the live terminal width on every repaint so panels
+# adapt to window resizes (static-screen contract: repaint on state change).
+# WZ_COLS env override exists for the regression harness (pipes have no stty).
 typeset COLS=80
-typeset _wz_sz
-_wz_sz=$(stty size 2>/dev/null)
-if [[ -n "$_wz_sz" ]]; then
-  COLS=${_wz_sz##* }
-fi
-(( COLS < 54 )) && COLS=54
-typeset INNER=$(( COLS - 6 ))
-typeset TOT=$(( INNER + 4 ))   # every box line = INNER+4 display cells
+typeset INNER=74
+typeset TOT=78
+refresh_size() {
+  local cols=80
+  local sz
+  if [[ -n "${WZ_COLS:-}" && "${WZ_COLS}" =~ '^[0-9]+$' ]]; then
+    cols=$WZ_COLS
+  else
+    sz=$(stty size 2>/dev/null)
+    if [[ -n "$sz" ]]; then
+      cols=${sz##* }
+    fi
+  fi
+  (( cols < 54 )) && cols=54
+  typeset -g COLS=$cols
+  typeset -g INNER=$(( cols - 6 ))
+  typeset -g TOT=$(( INNER + 4 ))   # every box line = INNER+4 display cells
+}
+refresh_size
 
 # =============================================================================
 # width helpers (display cells, CJK = 2 — same wcwidth semantics WezTerm uses)
@@ -57,6 +71,29 @@ pad() {  # pad <text> <width> — display-width aware; hard-truncate with '~'
       s="${s[1,-2]}"
     done
     print -n "${s}~"
+    local i pd
+    pd=$(( w - $(dwidth "$s") - 1 ))
+    for (( i = 0; i < pd; i++ )); do print -n " "; done
+  else
+    print -n "$t"
+    local i
+    for (( i = dw; i < w; i++ )); do print -n " "; done
+  fi
+}
+
+pad_tail() {  # pad_tail <text> <width> — head-truncate with leading '~'
+  local t="$1" w="$2"   # keeps the TAIL visible (paths: project name stays)
+  local dw
+  dw=$(dwidth "$t")
+  if (( dw > w )); then
+    local s="$t"
+    while (( $(dwidth "$s") > w - 1 )) && (( ${#s} > 1 )); do
+      s="${s[2,-1]}"
+    done
+    print -n "~${s}"
+    local i pd
+    pd=$(( w - $(dwidth "$s") - 1 ))
+    for (( i = 0; i < pd; i++ )); do print -n " "; done
   else
     print -n "$t"
     local i
@@ -124,19 +161,26 @@ key_row() {  # key_row <color> "chip:Y" "label:G" [ ... ]
     used=$(( used + w ))
   done
   if (( used > budget )); then
-    local last_text="${texts[-1]}"
-    local last_w
-    last_w=$(dwidth "$last_text")
-    local room=$(( budget - (used - last_w) ))
-    if (( room < 1 )); then
-      texts[-1]=""
-    else
-      local s="$last_text"
-      while (( $(dwidth "$s") > room )) && (( ${#s} > 1 )); do
-        s="${s[1,-2]}"
-      done
-      texts[-1]="$s"
-    fi
+    # squeeze from the LAST segment backward until the row fits:
+    # truncate the current segment when the rest fits, else drop it entirely
+    local k=${#texts}
+    while (( used > budget )) && (( k >= 1 )); do
+      local seg_w
+      seg_w=$(dwidth "${texts[$k]}")
+      local room=$(( budget - (used - seg_w) ))
+      if (( room >= 1 )); then
+        local s="${texts[$k]}"
+        while (( $(dwidth "$s") > room )) && (( ${#s} > 1 )); do
+          s="${s[1,-2]}"
+        done
+        texts[$k]="$s"
+        used=$(( used - seg_w + $(dwidth "$s") ))
+        break
+      fi
+      texts[$k]=""
+      used=$(( used - seg_w ))
+      k=$(( k - 1 ))
+    done
   fi
   used=0
   for (( i = 1; i <= ${#texts}; i++ )); do

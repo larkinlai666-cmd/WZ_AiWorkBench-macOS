@@ -190,6 +190,7 @@ launch_at() {  # launch_at <path> — default agent (bound column-3 first)
 # =============================================================================
 render() {
   print -n $'\e[2J\e[H'
+  refresh_size
   local autoLabel
   if (( auto == 1 )); then autoLabel="AUTO-ON"; else autoLabel="AUTO-OFF"; fi
 
@@ -209,11 +210,11 @@ render() {
   local maxp=$(( INNER - 8 ))
   (( maxp < 12 )) && maxp=12
   local view_label desk_label
-  view_label=$(pad "$VIEW" $maxp)
-  desk_label=$(pad "$DESK" $maxp)
-  key_row "$V" "D:VIEW  " "W:$(pad "$VIEW" $maxp)"
+  view_label=$(pad_tail "$VIEW" $maxp)
+  desk_label=$(pad_tail "$DESK" $maxp)
+  key_row "$V" "D:VIEW  " "W:${view_label}"
   if ! under_desk; then
-    key_row "$V" "D:DESK  " "G:$(pad "$DESK" $maxp)"
+    key_row "$V" "D:DESK  " "G:${desk_label}"
     box_rule "$V"
     box_line "! left DESK tree - press s to return" "$R"
   fi
@@ -229,7 +230,7 @@ render() {
     box_rule "$C"
     i=1
     while (( i <= ${#FAV_NAME} )); do
-      key_row "$C" "Y:[$idx]" "G: ★ ${FAV_NAME[$i]}" "D:  " "D:$(pad "${FAV_PATH[$i]}" $(( INNER - 14 )))"
+      key_row "$C" "Y:[$idx]" "G: ★ ${FAV_NAME[$i]}" "D:  " "D:$(pad_tail "${FAV_PATH[$i]}" $(( INNER - 14 )))"
       idx=$(( idx + 1 ))
       i=$(( i + 1 ))
     done

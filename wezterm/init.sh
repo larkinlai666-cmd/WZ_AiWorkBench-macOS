@@ -68,14 +68,43 @@ default_agent_idx() {  # pending task bound agent (D-005) else first installed
 # =============================================================================
 render() {
   print -n $'\e[2J\e[H'
+  refresh_size
   local list_active=$(( step == 1 ))
   local chipTok rowTok
   local i n t
 
-  # LIST column widths + 2-cell gap between columns (upstream ColGap)
-  local W_DATE=13 W_TAG=6 W_PROJ=14 W_AGENT=8 GAP=2
-  local W_PATH=$(( INNER - 1 - 3 - 3 - (W_DATE+GAP) - (W_TAG+GAP) - (W_PROJ+GAP) - GAP - W_AGENT ))
-  (( W_PATH < 8 )) && W_PATH=8
+  # LIST column layout (upstream Update-ColLayout parity):
+  #   - Project semi-flexible: INNER*14%, clamped [12, 22]
+  #   - Path semi-flexible with a HARD cap of 34 — wide hosts never let it
+  #     swallow the row; surplus becomes trailing whitespace (key_row pads
+  #     flush-right), so columns stay aligned at any aspect ratio
+  #   - narrow hosts squeeze in order Project -> Date -> Tag; ultra-narrow
+  #     (<=68 cols) lets key_row hard-truncate the Agent tail, frame intact
+  local W_DATE=13 W_TAG=6 W_AGENT=8 GAP=2
+  local W_PROJ=$(( INNER * 14 / 100 ))
+  (( W_PROJ > 22 )) && W_PROJ=22
+  (( W_PROJ < 12 )) && W_PROJ=12
+  local W_PATH=$(( INNER - 1 - 6 - W_DATE - W_TAG - W_AGENT - W_PROJ - 4 * GAP ))
+  if (( W_PATH > 34 )); then
+    W_PATH=34
+  elif (( W_PATH < 16 )); then
+    local need=$(( 16 - W_PATH ))
+    local cut
+    if (( need > 0 )) && (( W_PROJ > 12 )); then
+      cut=$(( W_PROJ - 12 )); (( cut > need )) && cut=$need
+      W_PROJ=$(( W_PROJ - cut )); need=$(( need - cut ))
+    fi
+    if (( need > 0 )) && (( W_DATE > 11 )); then
+      cut=$(( W_DATE - 11 )); (( cut > need )) && cut=$need
+      W_DATE=$(( W_DATE - cut )); need=$(( need - cut ))
+    fi
+    if (( need > 0 )) && (( W_TAG > 5 )); then
+      cut=$(( W_TAG - 5 )); (( cut > need )) && cut=$need
+      W_TAG=$(( W_TAG - cut )); need=$(( need - cut ))
+    fi
+    W_PATH=$(( INNER - 1 - 6 - W_DATE - W_TAG - W_AGENT - W_PROJ - 4 * GAP ))
+    (( W_PATH < 10 )) && W_PATH=10
+  fi
 
   # ----- HEADER -----
   local view_txt
@@ -127,7 +156,7 @@ render() {
         "${rowTok}:  " \
         "${rowTok}:$(pad "${TASKS_NAME[$i]}" $W_PROJ)" \
         "${rowTok}:  " \
-        "${rowTok}:$(pad "${TASKS_PATH[$i]}" $W_PATH)" \
+        "${rowTok}:$(pad_tail "${TASKS_PATH[$i]}" $W_PATH)" \
         "${rowTok}:  " \
         "${rowTok}:$(pad "${TASKS_AGENT[$i]}" $W_AGENT)"
       i=$(( i + 1 ))
@@ -344,7 +373,7 @@ step1_input() {
 }
 
 # =============================================================================
-# main loop
+# main loop (resize-adaptive: refresh_size re-reads width on every repaint)
 # =============================================================================
 load_agents
 load_tasks
